@@ -1,0 +1,13 @@
+{
+ "creation": "2026-04-11 06:56:44.392643",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2026-04-11 06:56:44.392643",
+ "modified_by": "Administrator",
+ "module": "Dashboards",
+ "name": "Main Dashboard Timeline Source",
+ "owner": "Administrator",
+ "source_name": "Main Dashboard Timeline Source",
+ "timeseries": 0
+}
