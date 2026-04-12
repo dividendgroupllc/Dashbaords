@@ -53,7 +53,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 							<div class="main-dashboard-side-metrics" data-region="side-metrics"></div>
 							<div class="main-dashboard-dividend">
 								<div data-region="dividend-card"></div>
-								<div class="main-dashboard-dividend-label">${__("Дивидент")}</div>
+								<div class="main-dashboard-dividend-label" data-region="balance-label">${__("Сальдо на конец")}</div>
 								<div class="main-dashboard-dividend-update-label">${__("Последнее обновление")}</div>
 								<div class="main-dashboard-dividend-update-time" data-region="updated-at"></div>
 							</div>
@@ -70,6 +70,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.$summaryTable = this.page.main.find('[data-region="summary-table"]');
 		this.$sideMetrics = this.page.main.find('[data-region="side-metrics"]');
 		this.$dividendCard = this.page.main.find('[data-region="dividend-card"]');
+		this.$balanceLabel = this.page.main.find('[data-region="balance-label"]');
 		this.$updatedAt = this.page.main.find('[data-region="updated-at"]');
 		this.$footerTicker = this.page.main.find('[data-region="footer-ticker"]');
 	}
@@ -90,6 +91,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.render_summary_table();
 		this.render_side_metrics();
 		this.render_footer();
+		this.$balanceLabel.text(this.context.balance_label || __("Сальдо на конец"));
 		this.$updatedAt.text(this.context.dividend_updated_at || "");
 	}
 
@@ -162,18 +164,25 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 	render_footer() {
 		const items = this.context.footer_items || [];
-		this.$footerTicker.html(
-			items
-				.map(
-					(item) => `
-						<div class="main-dashboard-footer-item">
-							<span class="main-dashboard-footer-label">${frappe.utils.escape_html(item.label)}</span>
-							<span class="main-dashboard-footer-value">${frappe.utils.escape_html(item.value)}</span>
-						</div>
-					`
-				)
-				.join("")
-		);
+		if (!items.length) {
+			this.$footerTicker.empty();
+			return;
+		}
+
+		const renderItem = (item) => `
+			<div class="main-dashboard-footer-item">
+				<span class="main-dashboard-footer-label">${frappe.utils.escape_html(item.label || "")}</span>
+				<span class="main-dashboard-footer-value">${this.formatNumber(item.value)}</span>
+			</div>
+		`;
+
+		const groupMarkup = items.map(renderItem).join("");
+		this.$footerTicker.html(`
+			<div class="main-dashboard-footer-track">
+				<div class="main-dashboard-footer-group">${groupMarkup}</div>
+				<div class="main-dashboard-footer-group" aria-hidden="true">${groupMarkup}</div>
+			</div>
+		`);
 	}
 
 	render_widgets() {
@@ -219,5 +228,10 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			number_card_name: cardName,
 			name: cardName,
 		});
+	}
+
+	formatNumber(value) {
+		const numericValue = Number(value || 0);
+		return numericValue.toLocaleString("en-US").replace(/,/g, " ");
 	}
 };

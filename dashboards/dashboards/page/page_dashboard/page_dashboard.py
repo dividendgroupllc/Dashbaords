@@ -2,6 +2,16 @@ from __future__ import annotations
 
 import frappe
 
+from dashboards.dashboards.page.page_dashboard.data import (
+    get_client_kpi_by_year,
+    get_dashboard_years,
+    get_default_year,
+    get_product_margin_by_year,
+    get_regional_summary_by_year,
+    get_returns_by_month,
+    get_sales_by_month,
+)
+
 
 TAB_ITEMS = [
     {"label": "ГЛАВНЫЙ", "route": "/app/main-dashboard"},
@@ -26,96 +36,6 @@ KPI_ITEMS = [
     {"key": "avg_check", "label": "Сред.чек"},
 ]
 
-SALES_BY_MONTH = [
-    ["January", "956 281 872"],
-    ["February", "971 530 442"],
-    ["March", "981 916 452"],
-    ["April", "1 027 848 995"],
-    ["May", "922 925 676"],
-    ["June", "834 183 118"],
-    ["July", "875 301 272"],
-    ["August", "1 190 444 957"],
-    ["September", "1 081 112 055"],
-    ["October", "1 088 151 347"],
-    ["November", "1 128 331 312"],
-    ["December", "2 359 363 759"],
-]
-
-RETURNS_BY_MONTH = [
-    ["January", "2 498 749"],
-    ["February", "909 572"],
-    ["March", "2 633 459"],
-    ["April", "4 457 810"],
-    ["May", "9 568 209"],
-    ["June", "53 727 177"],
-    ["July", "28 404 427"],
-    ["August", "5 905 785"],
-    ["September", "8 865 651"],
-    ["October", "2 716 417"],
-    ["November", "3 555 127"],
-    ["December", "6 437 381"],
-]
-
-PRODUCT_MARGIN_BY_YEAR = {
-    "2021": [
-        ["Догросса Ароматная", "5 020 136", "57,8%"],
-        ["Плов тушенка 325 гр.", "79 164 864", "52,3%"],
-        ["С-сегресы", "764 245", "50,9%"],
-        ["П/к. \"Рокиза\" Тов. ОК д-50", "3 337 080", "45,2%"],
-        ["П/к. \"Bunavon\" Московская д-50", "6 109 409", "41,2%"],
-        ["Total", "3 380 929 149", "25,2%", True],
-    ],
-    "2023": [
-        ["Колбаса сервелат", "4 018 004", "44,0%"],
-        ["Плов тушенка 325 гр.", "72 101 553", "48,2%"],
-        ["Total", "2 984 110 002", "23,9%", True],
-    ],
-    "2024": [
-        ["Догросса Ароматная", "5 020 136", "57,8%"],
-        ["Плов тушенка 325 гр.", "79 164 864", "52,3%"],
-        ["С-сегресы", "764 245", "50,9%"],
-        ["П/к. \"Рокиза\" Тов. ОК д-50", "3 337 080", "45,2%"],
-        ["П/к. \"Bunavon\" Московская д-50", "6 109 409", "41,2%"],
-        ["П/к. \"Рокиза\" КС 6", "3 253 706", "40,5%"],
-        ["П/к. \"Рокиза\" SALYAMI д-50", "60 686 158", "40,4%"],
-        ["П/к. \"Рокиза\" Choriq (Ичак)", "43 244 198", "39,9%"],
-        ["Товуқ қази \"Рокиза\"", "21 005 750", "38,9%"],
-        ["Говядина (Премиум) тушенка 325 гр.", "59 023 469", "38,2%", True],
-        ["Total", "3 380 929 149", "25,2%", True],
-    ],
-    "2025": [
-        ["Новый продукт", "8 211 044", "43,1%"],
-        ["Премиум тушенка", "41 803 922", "40,5%"],
-        ["Total", "1 980 887 410", "21,7%", True],
-    ],
-}
-
-CLIENT_KPI = [
-    ["ЧП Ҳаёт", "93 660", "3 018 987 138", "23,8%"],
-    ["ЯТТ Муродов Алишон", "80 711", "2 405 153 518", "20,6%"],
-    ["ЯТТ Махмудов", "39 113", "1 248 614 371", "24,4%"],
-    ["ЯТТ Равшан", "37 613", "1 216 142 262", "26,2%"],
-    ["ЯТТ Эхсон", "22 599", "719 446 412", "19,8%"],
-    ["ЭП Жамшид", "18 541", "696 640 375", "28,5%"],
-    ["ЯТТ Оркубек", "17 611", "656 029 019", "28,3%"],
-    ["Мухиддин", "17 856", "645 292 549", "25,3%"],
-    ["ЯТТ Илхом", "8 730", "358 203 556", "34,7%"],
-    ["Корея", "10 671", "345 710 886", "42,4%"],
-    ["FAYZ SAGBAN OK", "7 455", "305 206 720", "38,0%"],
-    ["ЧП Гафуров Тилла", "11 919", "305 063 386", "8,3%"],
-]
-
-REGIONAL_SUMMARY = [
-    ["Ферганская область", "3 120 785 651", "789 109 285", "25,9%"],
-    ["Самаркандская область", "3 018 987 138", "653 541 341", "23,8%"],
-    ["Наманган вилояти", "2 405 153 518", "480 355 881", "20,6%"],
-    ["Ташкент", "2 129 682 429", "513 780 704", "24,9%"],
-    ["", "1 519 840 178", "469 127 061", "31,3%"],
-    ["Кашкадарьинская область", "1 222 942 322", "345 479 629", "29,0%"],
-]
-
-YEARS = ["2021", "2023", "2024", "2025"]
-
 
 def _rows(data):
     rows = []
@@ -131,13 +51,17 @@ def _rows(data):
 
 @frappe.whitelist()
 def get_dashboard_context():
+    years = get_dashboard_years()
+    default_year = get_default_year()
+
     return {
         "tabs": TAB_ITEMS,
         "kpis": KPI_ITEMS,
-        "years": YEARS,
-        "sales_by_month": _rows(SALES_BY_MONTH),
-        "returns_by_month": _rows(RETURNS_BY_MONTH),
-        "product_margin_by_year": {year: _rows(rows) for year, rows in PRODUCT_MARGIN_BY_YEAR.items()},
-        "client_kpi": _rows(CLIENT_KPI),
-        "regional_summary": _rows(REGIONAL_SUMMARY),
+        "years": years,
+        "default_year": default_year,
+        "sales_by_month_by_year": {year: _rows(get_sales_by_month(year)) for year in years},
+        "returns_by_month_by_year": {year: _rows(get_returns_by_month(year)) for year in years},
+        "product_margin_by_year": {year: _rows(rows) for year, rows in get_product_margin_by_year().items()},
+        "client_kpi_by_year": {year: _rows(rows) for year, rows in get_client_kpi_by_year().items()},
+        "regional_summary_by_year": {year: _rows(rows) for year, rows in get_regional_summary_by_year().items()},
     }

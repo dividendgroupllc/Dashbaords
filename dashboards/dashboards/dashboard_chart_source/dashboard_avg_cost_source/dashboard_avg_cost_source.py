@@ -3,7 +3,7 @@ from __future__ import annotations
 import frappe
 from frappe.utils.dashboard import cache_source
 
-from dashboards.dashboards.dashboard_data import get_sales_amount_timeline
+from dashboards.dashboards.page.page_dashboard.data import get_avg_cost_chart_data
 
 
 @frappe.whitelist()
@@ -19,9 +19,4 @@ def get_data(
     time_interval=None,
     heatmap_year=None,
 ):
-    timeline = get_sales_amount_timeline(year_limit=2)
-
-    return {
-        "labels": timeline["labels"],
-        "datasets": [{"name": "Sales", "values": timeline["values"]}],
-    }
+    return get_avg_cost_chart_data()

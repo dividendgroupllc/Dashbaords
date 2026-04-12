@@ -1,253 +1,198 @@
 from __future__ import annotations
 
+from calendar import monthrange
+from typing import Any
+
 import frappe
+from frappe.utils import flt, getdate, today
+
+from dashboards.dashboards.dashboard_data import MONTH_LABELS
 
 
-YEARS = ["2021", "2023", "2024", "2025"]
+MONTHS = [{"key": label.lower(), "label": label} for label in MONTH_LABELS]
+MONTH_MAP = {item["key"]: index + 1 for index, item in enumerate(MONTHS)}
 
-MONTHS = [
-    {"key": "january", "label": "January"},
-    {"key": "february", "label": "February"},
-    {"key": "march", "label": "March"},
-    {"key": "april", "label": "April"},
-    {"key": "may", "label": "May"},
-    {"key": "june", "label": "June"},
-    {"key": "july", "label": "July"},
-    {"key": "august", "label": "August"},
-    {"key": "september", "label": "September"},
-    {"key": "october", "label": "October"},
-    {"key": "november", "label": "November"},
-    {"key": "december", "label": "December"},
-]
 
-CLIENTS = [
-    "ЧП Ҳаёт",
-    "Корея",
-    "FAYZ SAGBAN OK",
-    "ЯТТ Равшан",
-    "ЯТТ Норматов Гиёсжон",
-    "Мухиддин",
-    "ЧП Жамшид",
-    "ЯТТ Мурадов Алихон",
-    "ЯТТ Орзубек",
-    "ЯТТ Илхом",
-    "ЯТТ Махмуджон",
-    "ЯТТ Хавлон",
-    "ЧП Ботир",
-    "ЯТТ Холбек",
-    "Разний",
-    "Султон ака",
-    "ЯТТ Хавасбо Зафар Э",
-    "Одил",
-    "Ориф ака",
-    "Зокиржонов Илхом",
-    "ЯТТ Аброр",
-    "ЧП Гафуров Тилла Хуш",
-]
+def _get_years() -> list[str]:
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT YEAR(posting_date) AS year
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		  AND COALESCE(is_return, 0) = 0
+		  AND posting_date IS NOT NULL
+		ORDER BY year
+		""",
+		as_dict=True,
+	)
 
-CALENDAR_VALUES = {
-    1: 35,
-    2: 634,
-    3: 3278,
-    4: 335,
-    5: 772,
-    6: 1451,
-    7: 719,
-    8: 96,
-    9: 3035,
-    10: 3269,
-    11: 1734,
-    12: 53,
-    13: 1672,
-    14: 107,
-    16: 949,
-    17: 1060,
-    18: 1692,
-    19: 1021,
-    20: 1925,
-    21: 3615,
-    22: 3205,
-    23: 337,
-    24: 10810,
-    25: 4683,
-    26: 1730,
-    27: 4831,
-    28: 3192,
-    29: 9993,
-    30: 89,
-}
+	years = [str(row.year) for row in rows if row.year]
+	if years:
+		return years
 
-PRODUCT_ROWS = [
-    {
-        "item": "Рулет из мяса птицы коп-вар 0,5",
-        "kg": 10535,
-        "sales": 434306869,
-        "cost": 281208086,
-        "margin": 153098784,
-        "rsp": 48494782,
-        "profitability": 35.3,
-        "np": 104604003,
-        "np_profitability": 24,
-    },
-    {
-        "item": "Рулет \"YANGLIK\" коп-вар 0,5",
-        "kg": 8721,
-        "sales": 359020265,
-        "cost": 232552085,
-        "margin": 126528180,
-        "rsp": 40103978,
-        "profitability": 35.2,
-        "np": 86424000,
-        "np_profitability": 24,
-    },
-    {
-        "item": "Плов тушенка 325 гр.",
-        "kg": 5184,
-        "sales": 151289856,
-        "cost": 72124992,
-        "margin": 79164864,
-        "rsp": 23863250,
-        "profitability": 52.3,
-        "np": 55301614,
-        "np_profitability": 37,
-    },
-    {
-        "item": "Деликатесная 1-сорт",
-        "kg": 3785,
-        "sales": 158986944,
-        "cost": 101028467,
-        "margin": 57958477,
-        "rsp": 17422520,
-        "profitability": 36.5,
-        "np": 40535957,
-        "np_profitability": 25,
-    },
-    {
-        "item": "Докторская особая 1 сорт А",
-        "kg": 3699,
-        "sales": 105378848,
-        "cost": 84379680,
-        "margin": 20999168,
-        "rsp": 17013613,
-        "profitability": 19.9,
-        "np": 3985554,
-        "np_profitability": 4,
-    },
-    {
-        "item": "П/к. \"Сервелат\" Говяжий д-50",
-        "kg": 3493,
-        "sales": 140028776,
-        "cost": 97093848,
-        "margin": 42934929,
-        "rsp": 16067415,
-        "profitability": 30.7,
-        "np": 26867512,
-        "np_profitability": 19,
-    },
-    {
-        "item": "Для завтрака 1 сорт",
-        "kg": 3262,
-        "sales": 84760395,
-        "cost": 71296354,
-        "margin": 13464041,
-        "rsp": 15012120,
-        "profitability": 15.9,
-        "np": -1548079,
-        "np_profitability": -2,
-    },
-    {
-        "item": "Говядина (Премиум) тушенка 325 гр.",
-        "kg": 3060,
-        "sales": 117550800,
-        "cost": 72466920,
-        "margin": 45083880,
-        "rsp": 14085946,
-        "profitability": 38.4,
-        "np": 30997934,
-        "np_profitability": 26,
-    },
-    {
-        "item": "П/к. \"Buxanov\" Сервелат ок Т",
-        "kg": 2007,
-        "sales": 81484200,
-        "cost": 54193014,
-        "margin": 27291186,
-        "rsp": 9238724,
-        "profitability": 33.5,
-        "np": 18052462,
-        "np_profitability": 22,
-    },
-    {
-        "item": "П/к. \"Buxanov\" Украинская",
-        "kg": 1942,
-        "sales": 70685160,
-        "cost": 46423061,
-        "margin": 24262099,
-        "rsp": 8939052,
-        "profitability": 34.3,
-        "np": 15323045,
-        "np_profitability": 22,
-    },
-    {
-        "item": "Говядина (Баранина) тушенка 325 гр.",
-        "kg": 1296,
-        "sales": 49766040,
-        "cost": 37026864,
-        "margin": 12739536,
-        "rsp": 5965812,
-        "profitability": 25.2,
-        "np": 6593724,
-        "np_profitability": 13,
-    },
-    {
-        "item": "П/к. \"Rokiza\" Галлинская",
-        "kg": 1120,
-        "sales": 38710388,
-        "cost": 27215645,
-        "margin": 11494743,
-        "rsp": 4989463,
-        "profitability": 29.7,
-        "np": 6505280,
-        "np_profitability": 12,
-    },
-    {
-        "item": "П/к. \"Buxanov\" Чимкентская А",
-        "kg": 1046,
-        "sales": 31367410,
-        "cost": 24703382,
-        "margin": 6664028,
-        "rsp": 4815000,
-        "profitability": 21.2,
-        "np": 1849028,
-        "np_profitability": 6,
-    },
-    {
-        "item": "Сосиски Тигровый А",
-        "kg": 1033,
-        "sales": 26649802,
-        "cost": 20702102,
-        "margin": 5947700,
-        "rsp": 4756999,
-        "profitability": 22.3,
-        "np": 1190701,
-        "np_profitability": 4,
-    },
-]
+	return [str(getdate(today()).year)]
+
+
+def _get_default_period() -> tuple[str, str]:
+	latest_row = frappe.db.sql(
+		"""
+		SELECT MAX(posting_date) AS posting_date
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		  AND COALESCE(is_return, 0) = 0
+		""",
+		as_dict=True,
+	)[0]
+
+	reference_date = getdate(latest_row.posting_date) if latest_row.posting_date else getdate(today())
+	return str(reference_date.year), MONTH_LABELS[reference_date.month - 1].lower()
+
+
+def _normalize_filters(year: str | None, month: str | None) -> tuple[str, str]:
+	years = _get_years()
+	default_year, default_month = _get_default_period()
+	selected_year = year if year in years else default_year
+	selected_month = month if month in MONTH_MAP else default_month
+	return selected_year, selected_month
+
+
+def _base_filter_clause(year: str, month: str, alias: str = "si") -> tuple[str, dict[str, Any]]:
+	prefix = f"{alias}." if alias else ""
+	return (
+		f" AND YEAR({prefix}posting_date) = %(year)s AND MONTH({prefix}posting_date) = %(month)s",
+		{"year": int(year), "month": int(MONTH_MAP[month])},
+	)
+
+
+def _client_filter_clause(client: str | None, params: dict[str, Any], alias: str = "si") -> str:
+	if not client:
+		return ""
+
+	params["client"] = client
+	return (
+		f" AND COALESCE(NULLIF({alias}.customer_name, ''), {alias}.customer, 'Unknown Client') = %(client)s"
+	)
+
+
+def _get_clients(year: str, month: str) -> list[str]:
+	clause, params = _base_filter_clause(year, month, alias="si")
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Unknown Client') AS client,
+			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		{clause}
+		GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Unknown Client')
+		ORDER BY sales_amount DESC, client ASC
+		""",
+		params,
+		as_dict=True,
+	)
+	return [row.client for row in rows if row.client]
+
+
+def _get_calendar_values(year: str, month: str, client: str | None) -> dict[int, int]:
+	clause, params = _base_filter_clause(year, month, alias="si")
+	client_clause = _client_filter_clause(client, params, alias="si")
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			DAY(si.posting_date) AS day_no,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS total_qty
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		{clause}
+		{client_clause}
+		GROUP BY DAY(si.posting_date)
+		ORDER BY DAY(si.posting_date)
+		""",
+		params,
+		as_dict=True,
+	)
+	return {int(row.day_no): int(round(flt(row.total_qty))) for row in rows if row.day_no}
+
+
+def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[str, Any]]:
+	clause, params = _base_filter_clause(year, month, alias="si")
+	client_clause = _client_filter_clause(client, params, alias="si")
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item') AS item,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
+			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost,
+			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS rsp
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		{clause}
+		{client_clause}
+		GROUP BY COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item')
+		ORDER BY sales DESC, item ASC
+		LIMIT 20
+		""",
+		params,
+		as_dict=True,
+	)
+
+	result = []
+	for row in rows:
+		sales = flt(row.sales)
+		cost = flt(row.cost)
+		margin = sales - cost
+		rsp = flt(row.rsp)
+		np = margin - rsp
+		result.append(
+			{
+				"item": row.item,
+				"kg": round(flt(row.kg)),
+				"sales": round(sales),
+				"cost": round(cost),
+				"margin": round(margin),
+				"rsp": round(rsp),
+				"profitability": (margin / sales * 100) if sales else 0,
+				"np": round(np),
+				"np_profitability": (np / sales * 100) if sales else 0,
+			}
+		)
+
+	return result
 
 
 @frappe.whitelist()
-def get_dashboard_context():
-    return {
-        "title_primary": "З ИНФОРМАЦИОННАЯ ПАНЕЛЬ",
-        "title_secondary": "КОМПАНИЯ",
-        "default_filters": {
-            "year": "2024",
-            "month": "december",
-            "client": "ЧП Ҳаёт",
-        },
-        "years": YEARS,
-        "months": MONTHS,
-        "clients": CLIENTS,
-        "calendar_values": CALENDAR_VALUES,
-        "product_rows": PRODUCT_ROWS,
-    }
+def get_dashboard_context(year: str | None = None, month: str | None = None, client: str | None = None):
+	selected_year, selected_month = _normalize_filters(year, month)
+	clients = _get_clients(selected_year, selected_month)
+	selected_client = client if client in clients else (clients[0] if clients else None)
+
+	calendar_values = _get_calendar_values(selected_year, selected_month, selected_client)
+	product_rows = _get_product_rows(selected_year, selected_month, selected_client)
+	month_label = next((item["label"] for item in MONTHS if item["key"] == selected_month), selected_month.title())
+	total_days = monthrange(int(selected_year), MONTH_MAP[selected_month])[1]
+
+	return {
+		"title_primary": "З ИНФОРМАЦИОННАЯ ПАНЕЛЬ",
+		"title_secondary": "КОМПАНИЯ",
+		"default_filters": {
+			"year": selected_year,
+			"month": selected_month,
+			"client": selected_client,
+		},
+		"years": _get_years(),
+		"months": MONTHS,
+		"clients": clients,
+		"calendar_values": calendar_values,
+		"product_rows": product_rows,
+		"calendar_meta": {
+			"label": f"{month_label} {selected_year}",
+			"days_in_month": total_days,
+		},
+	}

@@ -69,9 +69,14 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		this.$table = this.page.main.find('[data-region="table"]');
 	}
 
-	load_context() {
+	load_context(filters = {}) {
 		frappe.call({
 			method: "dashboards.dashboards.page.daily_dashboard.daily_dashboard.get_dashboard_context",
+			args: {
+				year: filters.year || this.state.year,
+				month: filters.month || this.state.month,
+				client: Object.prototype.hasOwnProperty.call(filters, "client") ? filters.client : this.state.client,
+			},
 			callback: (r) => {
 				this.context = r.message || {};
 				this.state = { ...(this.context.default_filters || {}) };
@@ -106,8 +111,10 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		);
 
 		this.$years.find("[data-year]").on("click", (e) => {
-			this.state.year = String($(e.currentTarget).data("year"));
-			this.render();
+			this.load_context({
+				year: String($(e.currentTarget).data("year")),
+				client: null,
+			});
 		});
 	}
 
@@ -126,8 +133,10 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		);
 
 		this.$months.find("[data-month]").on("click", (e) => {
-			this.state.month = String($(e.currentTarget).data("month"));
-			this.render();
+			this.load_context({
+				month: String($(e.currentTarget).data("month")),
+				client: null,
+			});
 		});
 	}
 
@@ -148,10 +157,9 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		);
 
 		this.$clients.find("[data-client]").on("click", (e) => {
-			this.state.client = String($(e.currentTarget).data("client"));
-			this.render_calendar();
-			this.render_table();
-			this.render_clients();
+			this.load_context({
+				client: String($(e.currentTarget).data("client")),
+			});
 		});
 	}
 
@@ -160,7 +168,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 		const values = this.getCalendarValues();
 		const firstDayOffset = (date.getDay() + 6) % 7;
-		const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+		const lastDay = (this.context.calendar_meta || {}).days_in_month || new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 		const cells = [];
 
 		for (let index = 0; index < firstDayOffset; index += 1) {
@@ -177,7 +185,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			`);
 		}
 
-		this.$calendarTitle.text(`${this.getMonthLabel(this.state.month)} ${this.state.year}`);
+		this.$calendarTitle.text((this.context.calendar_meta || {}).label || `${this.getMonthLabel(this.state.month)} ${this.state.year}`);
 		this.$weekdays.html(
 			weekdays
 				.map((weekday) => `<div class="daily-dashboard-weekday">${frappe.utils.escape_html(weekday)}</div>`)
@@ -241,60 +249,11 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 	}
 
 	getCalendarValues() {
-		const base = this.context.calendar_values || {};
-		const yearFactorMap = {
-			"2021": 0.76,
-			"2023": 0.89,
-			"2024": 1,
-			"2025": 1.08,
-		};
-		const monthIndex = (this.context.months || []).findIndex((month) => month.key === this.state.month);
-		const monthFactor = 0.68 + (Math.max(monthIndex, 0) * 0.035);
-		const clientIndex = Math.max((this.context.clients || []).indexOf(this.state.client), 0);
-		const clientFactor = 0.93 + ((clientIndex % 7) * 0.023);
-		const factor = (yearFactorMap[this.state.year] || 1) * monthFactor * clientFactor;
-		const values = {};
-
-		Object.keys(base).forEach((day) => {
-			values[day] = Math.max(0, Math.round(base[day] * factor));
-		});
-
-		return values;
+		return this.context.calendar_values || {};
 	}
 
 	getProductRows() {
-		const baseRows = this.context.product_rows || [];
-		const yearFactorMap = {
-			"2021": 0.82,
-			"2023": 0.91,
-			"2024": 1,
-			"2025": 1.06,
-		};
-		const monthIndex = (this.context.months || []).findIndex((month) => month.key === this.state.month);
-		const clientIndex = Math.max((this.context.clients || []).indexOf(this.state.client), 0);
-		const monthFactor = 0.72 + (Math.max(monthIndex, 0) * 0.03);
-		const clientFactor = 0.9 + ((clientIndex % 9) * 0.02);
-		const factor = (yearFactorMap[this.state.year] || 1) * monthFactor * clientFactor;
-
-		return baseRows.map((row, rowIndex) => {
-			const variance = 1 + (((clientIndex + rowIndex) % 4) * 0.01);
-			const sales = Math.round(row.sales * factor * variance);
-			const cost = Math.round(row.cost * factor * (0.99 + (rowIndex % 3) * 0.01));
-			const margin = sales - cost;
-			const rsp = Math.round(row.rsp * factor * (0.98 + ((monthIndex + rowIndex) % 3) * 0.02));
-			const np = margin - rsp;
-			return {
-				item: row.item,
-				kg: Math.round(row.kg * factor * variance),
-				sales: sales,
-				cost: cost,
-				margin: margin,
-				rsp: rsp,
-				profitability: sales ? (margin / sales) * 100 : 0,
-				np: np,
-				np_profitability: sales ? (np / sales) * 100 : 0,
-			};
-		});
+		return this.context.product_rows || [];
 	}
 
 	buildTotalRow(rows) {

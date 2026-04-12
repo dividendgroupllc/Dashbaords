@@ -1,178 +1,338 @@
 from __future__ import annotations
 
+from typing import Any
+
 import frappe
+from frappe.utils import flt, getdate, today
+
+from dashboards.dashboards.dashboard_data import MONTH_LABELS, format_number
 
 
-YEARS = ["2021", "2022", "2023", "2024"]
-MONTHS = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-]
+def get_dashboard_years() -> list[str]:
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT YEAR(posting_date) AS year
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		  AND posting_date IS NOT NULL
+		ORDER BY year
+		""",
+		as_dict=True,
+	)
+
+	values = [str(row.year) for row in rows if row.year]
+	if values:
+		return values
+
+	return [str(getdate(today()).year)]
 
 
-def _series(*values):
-    return list(values)
+def get_default_period(selected_year: str | None = None) -> tuple[str, str]:
+	years = get_dashboard_years()
+	year = selected_year if selected_year in years else years[-1]
+
+	latest_row = frappe.db.sql(
+		"""
+		SELECT MAX(posting_date) AS posting_date
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		  AND YEAR(posting_date) = %(year)s
+		""",
+		{"year": int(year)},
+		as_dict=True,
+	)[0]
+
+	if latest_row.posting_date:
+		month = MONTH_LABELS[getdate(latest_row.posting_date).month - 1]
+	else:
+		month = MONTH_LABELS[0]
+
+	return year, month
 
 
-DATASET = {
-    "2021": {
-        "totals": {
-            "sales": "11 206 482 411",
-            "margin": "2 358 118 026",
-            "margin_minus_discount": "2 101 662 418",
-            "returns": "106 553 814",
-            "bonus": "74 228 511",
-            "discount": "256 455 608",
-        },
-        "months": {
-            "January": {
-                "client_rows": [
-                    ["ЧП Ҳаёт", "1 418 220 181", "1 087 209 144", "45 612", "10 225 101", "321 785 936", "22.7%", "18 400 220", "31 144 998", "24.5%"],
-                    ["FAYZ SAGBAN OK", "1 102 844 510", "842 448 170", "31 911", "6 110 412", "248 285 928", "22.5%", "13 884 115", "26 002 741", "22.2%"],
-                    ["ЯТТ Равшан", "944 830 118", "734 992 101", "29 084", "4 785 310", "198 214 550", "21.0%", "11 941 202", "19 792 265", "20.5%"],
-                    ["ЯТТ Махмудов", "803 110 420", "642 008 530", "24 509", "4 108 515", "151 255 775", "18.8%", "9 442 810", "17 822 181", "17.0%"],
-                    ["ЧП Гафуров Тилла", "676 229 334", "522 245 110", "19 441", "3 664 221", "145 288 404", "21.5%", "8 119 020", "12 885 690", "18.4%"],
-                    ["Total", "4 945 234 563", "3 828 903 055", "150 557", "28 893 559", "1 064 830 593", "21.5%", "61 787 367", "107 647 875", "20.3%", True],
-                ],
-                "aggregate_rows": [
-                    ["Top 5 Clients", "4 945 234 563", "1 064 830 593", "21.5%"],
-                    ["Other Clients", "6 261 247 848", "1 293 287 433", "20.6%"],
-                    ["Total", "11 206 482 411", "2 358 118 026", "21.0%", True],
-                ],
-                "treemap": [
-                    {"label": "ЧП Ҳаёт", "value": 1418220181},
-                    {"label": "FAYZ", "value": 1102844510},
-                    {"label": "Равшан", "value": 944830118},
-                    {"label": "Махмудов", "value": 803110420},
-                    {"label": "Гафуров", "value": 676229334},
-                    {"label": "Others", "value": 6261247848},
-                ],
-            }
-        },
-    },
-    "2022": {
-        "totals": {
-            "sales": "12 948 337 275",
-            "margin": "2 914 122 003",
-            "margin_minus_discount": "2 604 882 741",
-            "returns": "117 600 092",
-            "bonus": "82 901 314",
-            "discount": "309 239 262",
-        },
-        "months": {},
-    },
-    "2023": {
-        "totals": {
-            "sales": "14 206 901 482",
-            "margin": "3 104 299 851",
-            "margin_minus_discount": "2 765 542 931",
-            "returns": "126 441 570",
-            "bonus": "90 332 114",
-            "discount": "338 756 920",
-        },
-        "months": {},
-    },
-    "2024": {
-        "totals": {
-            "sales": "15 441 229 885",
-            "margin": "3 488 125 910",
-            "margin_minus_discount": "3 106 441 338",
-            "returns": "139 221 005",
-            "bonus": "95 008 144",
-            "discount": "381 684 572",
-        },
-        "months": {
-            "January": {
-                "client_rows": [
-                    ["ЧП Ҳаёт", "1 609 118 201", "1 201 228 114", "51 988", "12 114 229", "395 775 858", "24.6%", "20 778 512", "32 571 488", "25.2%"],
-                    ["ЯТТ Муродов", "1 402 337 118", "1 052 190 522", "41 026", "8 009 105", "336 224 041", "24.0%", "15 009 441", "28 554 009", "23.3%"],
-                    ["FAYZ SAGBAN OK", "1 206 662 044", "911 552 988", "34 211", "6 228 100", "282 901 122", "23.4%", "14 442 110", "20 118 945", "21.8%"],
-                    ["ЯТТ Равшан", "978 022 184", "741 447 772", "29 902", "4 882 914", "226 114 728", "23.1%", "10 278 320", "15 487 364", "21.5%"],
-                    ["ЯТТ Махмудов", "844 119 230", "650 118 414", "25 014", "4 224 118", "184 772 580", "21.9%", "9 103 008", "12 545 228", "20.5%"],
-                    ["ИП Жамшид", "731 224 004", "559 902 661", "22 021", "3 990 118", "163 998 212", "22.4%", "8 210 002", "10 424 331", "20.7%"],
-                    ["Корея", "618 992 415", "472 881 115", "19 118", "3 104 441", "139 331 771", "22.5%", "7 418 119", "9 138 992", "20.6%"],
-                    ["Total", "7 390 475 196", "5 589 321 586", "223 280", "42 553 025", "1 729 118 312", "23.4%", "85 239 512", "128 840 357", "21.7%", True],
-                ],
-                "aggregate_rows": [
-                    ["Top 7 Clients", "7 390 475 196", "1 729 118 312", "23.4%"],
-                    ["Other Clients", "8 050 754 689", "1 759 007 598", "21.8%"],
-                    ["Total", "15 441 229 885", "3 488 125 910", "22.6%", True],
-                ],
-                "treemap": [
-                    {"label": "ЧП Ҳаёт", "value": 1609118201},
-                    {"label": "Муродов", "value": 1402337118},
-                    {"label": "FAYZ", "value": 1206662044},
-                    {"label": "Равшан", "value": 978022184},
-                    {"label": "Махмудов", "value": 844119230},
-                    {"label": "Жамшид", "value": 731224004},
-                    {"label": "Корея", "value": 618992415},
-                    {"label": "Others", "value": 8050754689},
-                ],
-            },
-            "February": {
-                "client_rows": [
-                    ["ЧП Ҳаёт", "1 482 009 221", "1 110 224 210", "48 002", "10 777 110", "361 007 901", "24.4%", "18 551 220", "29 661 104", "24.3%"],
-                    ["ЯТТ Муродов", "1 287 771 104", "971 551 002", "39 880", "7 881 310", "302 110 792", "23.5%", "14 110 841", "22 220 569", "21.7%"],
-                    ["FAYZ SAGBAN OK", "1 119 662 004", "851 228 519", "32 118", "6 004 214", "256 229 271", "22.9%", "12 802 112", "17 640 621", "20.9%"],
-                    ["Total", "6 944 118 331", "5 207 400 611", "210 144", "38 509 200", "1 661 404 007", "23.9%", "78 921 003", "120 900 110", "22.1%", True],
-                ],
-                "aggregate_rows": [
-                    ["Top Clients", "6 944 118 331", "1 661 404 007", "23.9%"],
-                    ["Other Clients", "8 497 111 554", "1 826 721 903", "21.5%"],
-                    ["Total", "15 441 229 885", "3 488 125 910", "22.6%", True],
-                ],
-                "treemap": [
-                    {"label": "ЧП Ҳаёт", "value": 1482009221},
-                    {"label": "Муродов", "value": 1287771104},
-                    {"label": "FAYZ", "value": 1119662004},
-                    {"label": "Others", "value": 11552247556},
-                ],
-            },
-        },
-    },
-}
+def _get_period_params(year: str, month: str | None = None) -> dict[str, int]:
+	params = {"year": int(year)}
+	if month in MONTH_LABELS:
+		params["month"] = MONTH_LABELS.index(month) + 1
+	return params
 
 
-def _get_fallback_month_data(year: str, month: str) -> dict:
-    year_data = DATASET[year]
-    month_data = year_data["months"].get(month)
-    if month_data:
-        return month_data
+def _period_clause(year: str, month: str | None = None, alias: str = "") -> tuple[str, dict[str, int]]:
+	prefix = f"{alias}." if alias else ""
+	params = _get_period_params(year, month)
+	clause = f" AND YEAR({prefix}posting_date) = %(year)s"
+	if "month" in params:
+		clause += f" AND MONTH({prefix}posting_date) = %(month)s"
+	return clause, params
 
-    january = next(iter(year_data["months"].values()))
-    return january
+
+def _get_kpi_totals(year: str, month: str) -> dict[str, str]:
+	invoice_clause, invoice_params = _period_clause(year, month)
+	item_clause, item_params = _period_clause(year, month, alias="si")
+
+	invoice_totals = frappe.db.sql(
+		f"""
+		SELECT
+			SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(base_net_total, net_total, 0)) ELSE 0 END) AS return_total,
+			SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN COALESCE(loyalty_amount, 0) ELSE 0 END) AS loyalty_bonus
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		{invoice_clause}
+		""",
+		invoice_params,
+		as_dict=True,
+	)[0]
+
+	item_totals = frappe.db.sql(
+		f"""
+		SELECT
+			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_total,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_total,
+			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS discount_total,
+			SUM(
+				CASE
+					WHEN COALESCE(sii.is_free_item, 0) = 1
+						THEN COALESCE(sii.base_price_list_rate, sii.price_list_rate, 0) * COALESCE(sii.qty, 0)
+					ELSE 0
+				END
+			) AS free_item_bonus
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		{item_clause}
+		""",
+		item_params,
+		as_dict=True,
+	)[0]
+
+	sales_total = flt(item_totals.sales_total)
+	cost_total = flt(item_totals.cost_total)
+	margin_total = sales_total - cost_total
+	discount_total = flt(item_totals.discount_total)
+	bonus_total = flt(item_totals.free_item_bonus) + flt(invoice_totals.loyalty_bonus)
+
+	return {
+		"sales": format_number(sales_total),
+		"margin": format_number(margin_total),
+		"margin_minus_discount": format_number(margin_total - discount_total),
+		"returns": format_number(invoice_totals.return_total),
+		"bonus": format_number(bonus_total),
+		"discount": format_number(discount_total),
+	}
+
+
+def _get_client_metrics(year: str, month: str) -> list[dict[str, Any]]:
+	item_clause, item_params = _period_clause(year, month, alias="si")
+	invoice_clause, invoice_params = _period_clause(year, month)
+
+	sales_rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Unknown Client') AS client,
+			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_amount,
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
+			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS discount_total,
+			SUM(
+				CASE
+					WHEN COALESCE(sii.is_free_item, 0) = 1
+						THEN COALESCE(sii.base_price_list_rate, sii.price_list_rate, 0) * COALESCE(sii.qty, 0)
+					ELSE 0
+				END
+			) AS bonus_total
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		{item_clause}
+		GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Unknown Client')
+		""",
+		item_params,
+		as_dict=True,
+	)
+
+	return_rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(customer_name, ''), customer, 'Unknown Client') AS client,
+			SUM(ABS(COALESCE(base_net_total, net_total, 0))) AS return_amount,
+			SUM(COALESCE(loyalty_amount, 0)) AS loyalty_bonus
+		FROM `tabSales Invoice`
+		WHERE docstatus = 1
+		  AND COALESCE(is_return, 0) = 1
+		{invoice_clause}
+		GROUP BY COALESCE(NULLIF(customer_name, ''), customer, 'Unknown Client')
+		""",
+		invoice_params,
+		as_dict=True,
+	)
+
+	return_map = {
+		row.client: {
+			"return_amount": flt(row.return_amount),
+			"loyalty_bonus": flt(row.loyalty_bonus),
+		}
+		for row in return_rows
+	}
+
+	clients = []
+	for row in sales_rows:
+		sales_amount = flt(row.sales_amount)
+		cost_amount = flt(row.cost_amount)
+		margin_amount = sales_amount - cost_amount
+		return_amount = flt(return_map.get(row.client, {}).get("return_amount"))
+		discount_total = flt(row.discount_total)
+		bonus_total = flt(row.bonus_total) + flt(return_map.get(row.client, {}).get("loyalty_bonus"))
+		net_margin = margin_amount - discount_total
+		clients.append(
+			{
+				"client": row.client,
+				"sales": sales_amount,
+				"cost": cost_amount,
+				"qty": flt(row.qty_total),
+				"returns": return_amount,
+				"margin": margin_amount,
+				"margin_percent": (margin_amount / sales_amount * 100) if sales_amount else 0,
+				"bonus": bonus_total,
+				"discount": discount_total,
+				"net_margin": net_margin,
+				"profitability": (net_margin / sales_amount * 100) if sales_amount else 0,
+			}
+		)
+
+	return sorted(clients, key=lambda row: row["sales"], reverse=True)
+
+
+def _build_client_rows(metrics: list[dict[str, Any]], limit: int = 10) -> list[list[str | bool]]:
+	rows: list[list[str | bool]] = []
+	for row in metrics[:limit]:
+		rows.append(
+			[
+				row["client"],
+				format_number(row["sales"]),
+				format_number(row["cost"]),
+				format_number(row["qty"]),
+				format_number(row["returns"]),
+				format_number(row["margin"]),
+				f"{row['margin_percent']:.1f}%",
+				format_number(row["bonus"]),
+				format_number(row["discount"]),
+				format_number(row["net_margin"]),
+				f"{row['profitability']:.1f}%",
+			]
+		)
+
+	total_sales = sum(row["sales"] for row in metrics)
+	total_cost = sum(row["cost"] for row in metrics)
+	total_returns = sum(row["returns"] for row in metrics)
+	total_margin = sum(row["margin"] for row in metrics)
+	total_bonus = sum(row["bonus"] for row in metrics)
+	total_discount = sum(row["discount"] for row in metrics)
+	total_net_margin = sum(row["net_margin"] for row in metrics)
+	total_qty = sum(row["qty"] for row in metrics)
+
+	rows.append(
+		[
+			"Total",
+			format_number(total_sales),
+			format_number(total_cost),
+			format_number(total_qty),
+			format_number(total_returns),
+			format_number(total_margin),
+			f"{(total_margin / total_sales * 100):.1f}%" if total_sales else "0.0%",
+			format_number(total_bonus),
+			format_number(total_discount),
+			format_number(total_net_margin),
+			f"{(total_net_margin / total_sales * 100):.1f}%" if total_sales else "0.0%",
+			True,
+		]
+	)
+	return rows
+
+
+def _build_summary_rows(metrics: list[dict[str, Any]], limit: int = 8) -> list[list[str | bool]]:
+	total_sales = sum(row["sales"] for row in metrics) or 1
+	rows: list[list[str | bool]] = []
+
+	for row in metrics[:limit]:
+		rows.append(
+			[
+				row["client"],
+				format_number(row["sales"]),
+				f"{(row['sales'] / total_sales * 100):.1f}%",
+				format_number(row["margin"]),
+				format_number(row["bonus"]),
+				format_number(row["discount"]),
+			]
+		)
+
+	rows.append(
+		[
+			"Total",
+			format_number(sum(row["sales"] for row in metrics)),
+			"100.0%",
+			format_number(sum(row["margin"] for row in metrics)),
+			format_number(sum(row["bonus"] for row in metrics)),
+			format_number(sum(row["discount"] for row in metrics)),
+			True,
+		]
+	)
+	return rows
+
+
+def _build_aggregate_rows(metrics: list[dict[str, Any]], limit: int = 6) -> list[list[str | bool]]:
+	top_metrics = metrics[:limit]
+	other_metrics = metrics[limit:]
+
+	def summarize(label: str, rows: list[dict[str, Any]], is_total: bool = False) -> list[str | bool]:
+		sales_total = sum(row["sales"] for row in rows)
+		net_margin = sum(row["net_margin"] for row in rows)
+		discount_total = sum(row["discount"] for row in rows)
+		result: list[str | bool] = [
+			label,
+			format_number(sales_total),
+			format_number(net_margin),
+			format_number(discount_total),
+			f"{(net_margin / sales_total * 100):.1f}%" if sales_total else "0.0%",
+		]
+		if is_total:
+			result.append(True)
+		return result
+
+	rows = [summarize(f"Top {min(limit, len(metrics))} Clients", top_metrics)]
+	if other_metrics:
+		rows.append(summarize("Other Clients", other_metrics))
+	rows.append(summarize("Total", metrics, is_total=True))
+	return rows
+
+
+def _build_treemap(metrics: list[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
+	top_metrics = metrics[:limit]
+	other_sales = sum(row["sales"] for row in metrics[limit:])
+	items = [{"label": row["client"], "value": round(row["sales"])} for row in top_metrics]
+	if other_sales:
+		items.append({"label": "Others", "value": round(other_sales)})
+	return items
 
 
 @frappe.whitelist()
 def get_kpi_dashboard_data(year: str | None = None, month: str | None = None):
-    year = year or "2024"
-    month = month or "January"
+	default_year, default_month = get_default_period(year)
+	selected_year = year if year in get_dashboard_years() else default_year
+	selected_month = month if month in MONTH_LABELS else default_month
 
-    if year not in DATASET:
-        year = "2024"
-    if month not in MONTHS:
-        month = "January"
+	client_metrics = _get_client_metrics(selected_year, selected_month)
 
-    month_data = _get_fallback_month_data(year, month)
-
-    return {
-        "title": "KPI",
-        "years": YEARS,
-        "months": MONTHS,
-        "selected_year": year,
-        "selected_month": month,
-        "kpi_totals": DATASET[year]["totals"],
-        "client_rows": month_data["client_rows"],
-        "aggregate_rows": month_data["aggregate_rows"],
-        "treemap": month_data["treemap"],
-    }
+	return {
+		"title": "KPI",
+		"years": get_dashboard_years(),
+		"months": MONTH_LABELS,
+		"selected_year": selected_year,
+		"selected_month": selected_month,
+		"kpi_totals": _get_kpi_totals(selected_year, selected_month),
+		"client_rows": _build_client_rows(client_metrics),
+		"summary_rows": _build_summary_rows(client_metrics),
+		"aggregate_rows": _build_aggregate_rows(client_metrics),
+		"treemap": _build_treemap(client_metrics),
+	}

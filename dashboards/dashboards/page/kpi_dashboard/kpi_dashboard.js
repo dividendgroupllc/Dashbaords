@@ -12,16 +12,16 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 			title: __("KPI"),
 			single_column: true,
 		});
-		this.selectedYear = "2024";
-		this.selectedMonth = "January";
-		this.kpiCards = {
-			sales: "KPI Dashboard Sales Total",
-			margin: "KPI Dashboard Margin Total",
-			margin_minus_discount: "KPI Dashboard Margin Minus Discount",
-			returns: "KPI Dashboard Returns Total",
-			bonus: "KPI Dashboard Bonus Total",
-			discount: "KPI Dashboard Discount Total",
-		};
+		this.selectedYear = null;
+		this.selectedMonth = null;
+		this.kpiMeta = [
+			["sales", "Продажа", "Общий объем продаж за период"],
+			["margin", "Маржа", "Продажа минус себестоимость"],
+			["margin_minus_discount", "Маржа-Бонус-Скидка", "Чистая маржа после скидок"],
+			["returns", "Возврат", "Сумма возвратов клиентов"],
+			["bonus", "Бонус", "Лояльность и бесплатные позиции"],
+			["discount", "Скидка", "Сумма скидок по строкам"],
+		];
 
 		this.make_layout();
 		this.load_data();
@@ -35,7 +35,15 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		this.page.main.html(`
 			<div class="kpi-dashboard-screen">
 				<div class="kpi-dashboard-header">
+					<div class="kpi-dashboard-brand">
+						<div class="kpi-dashboard-logo">KP</div>
+						<div class="kpi-dashboard-brand-copy">
+							<div class="kpi-dashboard-brand-title">2 Информационная Панель</div>
+							<div class="kpi-dashboard-brand-subtitle">Компания</div>
+						</div>
+					</div>
 					<div class="kpi-dashboard-title">KPI</div>
+					<div class="kpi-dashboard-header-info">i</div>
 				</div>
 				<div class="kpi-dashboard-body">
 					<aside class="kpi-dashboard-sidebar">
@@ -50,16 +58,17 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 					</aside>
 					<section class="kpi-dashboard-main">
 						<div class="kpi-dashboard-kpis" data-region="kpis"></div>
+						<div class="kpi-dashboard-caption" data-region="caption"></div>
 						<div class="kpi-dashboard-card">
 							<div class="kpi-dashboard-table-wrap" data-region="client-table"></div>
 						</div>
 						<div class="kpi-dashboard-bottom">
 							<div class="kpi-dashboard-card">
-								<div class="kpi-dashboard-subtitle">Client Summary</div>
-								<div class="kpi-dashboard-table-wrap" data-region="aggregate-table"></div>
+								<div class="kpi-dashboard-subtitle">Клиент</div>
+								<div class="kpi-dashboard-table-wrap" data-region="summary-table"></div>
 							</div>
 							<div class="kpi-dashboard-card">
-								<div class="kpi-dashboard-subtitle">Client Distribution</div>
+								<div class="kpi-dashboard-subtitle">Диаграмма клиента</div>
 								<div class="kpi-dashboard-treemap" data-region="treemap"></div>
 							</div>
 						</div>
@@ -71,8 +80,9 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		this.$years = this.page.main.find('[data-region="years"]');
 		this.$months = this.page.main.find('[data-region="months"]');
 		this.$kpis = this.page.main.find('[data-region="kpis"]');
+		this.$caption = this.page.main.find('[data-region="caption"]');
 		this.$clientTable = this.page.main.find('[data-region="client-table"]');
-		this.$aggregateTable = this.page.main.find('[data-region="aggregate-table"]');
+		this.$summaryTable = this.page.main.find('[data-region="summary-table"]');
 		this.$treemap = this.page.main.find('[data-region="treemap"]');
 	}
 
@@ -96,8 +106,9 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		this.render_years();
 		this.render_months();
 		this.render_kpis();
+		this.render_caption();
 		this.render_client_table();
-		this.render_aggregate_table();
+		this.render_summary_table();
 		this.render_treemap();
 	}
 
@@ -116,6 +127,7 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 
 		this.$years.find(".kpi-dashboard-year").on("click", (e) => {
 			this.selectedYear = $(e.currentTarget).data("year");
+			this.selectedMonth = null;
 			this.load_data();
 		});
 	}
@@ -126,6 +138,7 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 				.map(
 					(month) => `
 						<button class="kpi-dashboard-month ${month === this.selectedMonth ? "is-active" : ""}" data-month="${month}">
+							<span class="kpi-dashboard-month-mark"></span>
 							${frappe.utils.escape_html(month)}
 						</button>
 					`
@@ -140,46 +153,46 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 	}
 
 	render_kpis() {
-		const labels = [
-			["sales", "Sales"],
-			["margin", "Margin"],
-			["margin_minus_discount", "Margin Minus Discount"],
-			["returns", "Returns"],
-			["bonus", "Bonus"],
-			["discount", "Discount"],
-		];
-
+		const totals = this.data.kpi_totals || {};
 		this.$kpis.html(
-			labels
+			this.kpiMeta
 				.map(
-					([key, label]) => `
+					([key, label, subtext]) => `
 						<div class="kpi-dashboard-card kpi-dashboard-kpi-card">
-							<div class="kpi-dashboard-kpi-value" data-kpi-card="${key}"></div>
+							<div class="kpi-dashboard-kpi-value">${frappe.utils.escape_html(totals[key] || "0")}</div>
 							<div class="kpi-dashboard-kpi-label">${frappe.utils.escape_html(label)}</div>
+							<div class="kpi-dashboard-kpi-subtext">${frappe.utils.escape_html(subtext)}</div>
 						</div>
 					`
 				)
 				.join("")
 		);
+	}
 
-		labels.forEach(([key]) => {
-			this.mount_number_card(this.$kpis.find(`[data-kpi-card="${key}"]`), this.kpiCards[key]);
-		});
+	render_caption() {
+		this.$caption.text(
+			`${this.selectedMonth || ""} ${this.selectedYear || ""} kesimidagi KPI ko'rsatkichlari mijozlar kesimida dinamik ravishda bazadan yuklandi.`
+		);
 	}
 
 	render_client_table() {
-		const headers = ["Client", "Sales", "Cost", "Qty", "Returns", "Margin", "%", "Bonus", "Discount", "Profitability"];
+		const headers = ["Клиент", "Продажа", "Сб.ст", "КГ", "Возврат", "Маржа", "%", "Бонус", "Скидка", "Маржа нет", "PnL"];
 		this.$clientTable.html(this.make_table(headers, this.data.client_rows || [], "wide"));
 	}
 
-	render_aggregate_table() {
-		const headers = ["Group", "Sales", "Margin", "%"];
-		this.$aggregateTable.html(this.make_table(headers, this.data.aggregate_rows || [], "compact"));
+	render_summary_table() {
+		const headers = ["Клиент", "Продажа", "%", "Маржа", "Бонус", "Скидка"];
+		this.$summaryTable.html(this.make_table(headers, this.data.summary_rows || [], "compact"));
 	}
 
 	make_table(headers, rows, variant) {
+		const widths = this.get_column_widths(variant, headers.length);
+		const colgroup = widths.length
+			? `<colgroup>${widths.map((width) => `<col style="width:${width}">`).join("")}</colgroup>`
+			: "";
 		return `
 			<table class="kpi-dashboard-table kpi-dashboard-table--${variant}">
+				${colgroup}
 				<thead>
 					<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
 				</thead>
@@ -205,34 +218,36 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		`;
 	}
 
+	get_column_widths(variant, length) {
+		if (variant === "wide") {
+			return ["18%", "9%", "9%", "7%", "9%", "9%", "6%", "9%", "8%", "10%", "6%"];
+		}
+
+		if (variant === "compact") {
+			return ["28%", "16%", "10%", "16%", "15%", "15%"];
+		}
+
+		return new Array(length).fill(`${Math.floor(100 / Math.max(length, 1))}%`);
+	}
+
 	render_treemap() {
 		const items = this.data.treemap || [];
-		const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
-		const palette = ["#128c3a", "#18a646", "#22ba52", "#39c965", "#62d880", "#8fe6a6", "#baf2c6", "#dff9e6"];
+		const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0) || 1;
+		const palette = ["#2f87e4", "#2836a7", "#f07432", "#7a0f93", "#d63ba6", "#7251c7", "#f0c000", "#20a36e"];
+		const formatNumber = (value) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Number(value || 0));
 
 		this.$treemap.html(
 			items
 				.map((item, index) => {
-					const width = Math.max(18, Math.round((item.value / total) * 100));
+					const ratio = Math.max(10, Math.round((Number(item.value || 0) / total) * 100));
 					return `
-						<div class="kpi-dashboard-treemap-item" style="flex:${width}; background:${palette[index % palette.length]}">
+						<div class="kpi-dashboard-treemap-item" style="flex:${ratio}; background:${palette[index % palette.length]}">
 							<div class="kpi-dashboard-treemap-name">${frappe.utils.escape_html(item.label)}</div>
-							<div class="kpi-dashboard-treemap-value">${frappe.utils.escape_html(frappe.format(item.value, { fieldtype: "Int" }))}</div>
+							<div class="kpi-dashboard-treemap-value">${frappe.utils.escape_html(formatNumber(item.value))}</div>
 						</div>
 					`;
 				})
 				.join("")
 		);
-	}
-
-	mount_number_card($container, cardName) {
-		$container.empty();
-		frappe.widget.make_widget({
-			widget_type: "number_card",
-			container: $container,
-			label: cardName,
-			number_card_name: cardName,
-			name: cardName,
-		});
 	}
 };

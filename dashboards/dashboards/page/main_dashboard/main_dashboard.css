@@ -228,9 +228,8 @@
 }
 
 .main-dashboard-footer {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 0;
+	position: relative;
+	overflow: hidden;
 	margin: 0 -14px;
 	padding: 10px 16px 12px;
 	background: linear-gradient(180deg, rgba(31, 49, 173, 0.98) 0%, rgba(18, 34, 133, 1) 100%);
@@ -238,8 +237,23 @@
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.main-dashboard-footer-track {
+	display: flex;
+	gap: 48px;
+	width: max-content;
+	animation: main-dashboard-ticker-scroll 22s linear infinite;
+	will-change: transform;
+}
+
+.main-dashboard-footer-group {
+	display: flex;
+	flex-shrink: 0;
+	gap: 48px;
+}
+
 .main-dashboard-footer-item {
 	display: flex;
+	flex-shrink: 0;
 	align-items: baseline;
 	justify-content: center;
 	gap: 14px;
@@ -253,6 +267,10 @@
 .main-dashboard-footer-value {
 	font-size: 24px;
 	letter-spacing: 0.1em;
+}
+
+.main-dashboard-footer:hover .main-dashboard-footer-track {
+	animation-play-state: paused;
 }
 
 .main-dashboard-panel .chart-loading-state,
@@ -324,11 +342,26 @@
 		grid-template-columns: 1fr;
 	}
 
+	.main-dashboard-footer-track,
+	.main-dashboard-footer-group {
+		gap: 24px;
+	}
+
 	.main-dashboard-footer-item {
 		font-size: 16px;
 	}
 
 	.main-dashboard-footer-value {
 		font-size: 18px;
+	}
+}
+
+@keyframes main-dashboard-ticker-scroll {
+	from {
+		transform: translateX(100%);
+	}
+
+	to {
+		transform: translateX(calc(-50% - 24px));
 	}
 }

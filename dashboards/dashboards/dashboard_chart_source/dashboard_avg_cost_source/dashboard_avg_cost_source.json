@@ -1,0 +1,13 @@
+{
+ "creation": "2026-04-12 05:26:34.273107",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2026-04-12 07:45:35.584190",
+ "modified_by": "Administrator",
+ "module": "Dashboards",
+ "name": "Dashboard Avg Cost Source",
+ "owner": "Administrator",
+ "source_name": "Dashboard Avg Cost Source",
+ "timeseries": 0
+}

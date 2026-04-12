@@ -208,6 +208,10 @@ fixtures = [
 # before_request = ["dashboards.utils.before_request"]
 # after_request = ["dashboards.utils.after_request"]
 
+# Re-apply dashboard widget metadata on every migrate so missing/edited
+# chart and number card records are repaired automatically.
+after_migrate = ["dashboards.patches.v1_0.setup_main_dashboard.execute"]
+
 # Job Events
 # ----------
 # before_job = ["dashboards.utils.before_job"]

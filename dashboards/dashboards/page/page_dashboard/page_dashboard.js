@@ -12,7 +12,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 			title: __("Dashboard"),
 			single_column: true,
 		});
-		this.selectedYear = "2024";
+		this.selectedYear = null;
 		this.kpiCards = {
 			sales_total: "Dashboard KPI Sales Total",
 			cost_total: "Dashboard KPI Cost Total",
@@ -94,6 +94,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 			method: "dashboards.dashboards.page.page_dashboard.page_dashboard.get_dashboard_context",
 			callback: (r) => {
 				this.context = r.message || {};
+				this.selectedYear = String(this.context.default_year || this.selectedYear || "");
 				this.render();
 			},
 		});
@@ -161,7 +162,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 						</button>
 					`
 				)
-				.join("") + '<div class="dashboard-page-year-spinner">•<br>•</div>'
+				.join("") + '<div class="dashboard-page-year-spinner"></div>'
 		);
 
 		this.$years.find(".dashboard-page-year").on("click", (e) => {
@@ -172,15 +173,31 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 	}
 
 	render_tables() {
-		this.render_table("sales-by-month", this.context.sales_by_month, ["Month", "Сумма.прод"]);
-		this.render_table("returns-by-month", this.context.returns_by_month, ["Month", "Возврат"]);
+		this.render_table(
+			"sales-by-month",
+			((this.context.sales_by_month_by_year || {})[this.selectedYear]) || [],
+			["Month", "Сумма.прод"]
+		);
+		this.render_table(
+			"returns-by-month",
+			((this.context.returns_by_month_by_year || {})[this.selectedYear]) || [],
+			["Month", "Возврат"]
+		);
 		this.render_table(
 			"product-margin",
 			(this.context.product_margin_by_year || {})[this.selectedYear] || [],
 			["Предметы", "Маржа", "Рен"]
 		);
-		this.render_table("client-kpi", this.context.client_kpi, ["Клиент", "КГ", "Сумма.прод", "Рен"]);
-		this.render_table("regional-summary", this.context.regional_summary, ["Город", "Сумма", "Маржа", "Рен"]);
+		this.render_table(
+			"client-kpi",
+			((this.context.client_kpi_by_year || {})[this.selectedYear]) || [],
+			["Клиент", "КГ", "Сумма.прод", "Рен"]
+		);
+		this.render_table(
+			"regional-summary",
+			((this.context.regional_summary_by_year || {})[this.selectedYear]) || [],
+			["Город", "Сумма", "Маржа", "Рен"]
+		);
 	}
 
 	render_table(key, rows, headers) {
