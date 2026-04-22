@@ -13,19 +13,10 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 			single_column: true,
 		});
 		this.selectedYear = null;
-		this.kpiCards = {
-			sales_total: "Dashboard KPI Sales Total",
-			cost_total: "Dashboard KPI Cost Total",
-			margin_total: "Dashboard KPI Margin Total",
-			rsp_total: "Dashboard KPI RSP Total",
-			return_total: "Dashboard KPI Return Total",
-			kg_total: "Dashboard KPI Kg Total",
-			avg_check: "Dashboard KPI Avg Check",
-		};
 		this.charts = {
-			price_trend: "Dashboard Avg Cost Chart",
-			check_trend: "Dashboard Avg Check Chart",
-			kg_trend: "Dashboard Product Kg Chart",
+			price_trend: { valueLabel: "Сред себе", totalLabel: "Макс" },
+			check_trend: { valueLabel: "Сред цена", totalLabel: "Макс" },
+			kg_trend: { valueLabel: "КГ", totalLabel: "Всего" },
 		};
 
 		this.make_layout();
@@ -137,12 +128,13 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 
 	render_kpis() {
 		const kpis = this.context.kpis || [];
+		const totals = (this.context.kpi_totals_by_year || {})[this.selectedYear] || {};
 		this.$kpis.html(
 			kpis
 				.map(
 					(kpi) => `
 						<div class="dashboard-page-card dashboard-page-kpi-card">
-							<div class="dashboard-page-kpi-number" data-kpi-card="${kpi.key}"></div>
+							<div class="dashboard-page-kpi-number">${frappe.utils.escape_html(totals[kpi.key] || "0")}</div>
 							<div class="dashboard-page-kpi-label">${frappe.utils.escape_html(kpi.label)}</div>
 							${kpi.subtext ? `<div class="dashboard-page-kpi-subtext">${frappe.utils.escape_html(kpi.subtext)}</div>` : ""}
 						</div>
@@ -150,10 +142,6 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 				)
 				.join("")
 		);
-
-		kpis.forEach((kpi) => {
-			this.mount_number_card(this.page.main.find(`[data-kpi-card="${kpi.key}"]`), this.kpiCards[kpi.key]);
-		});
 	}
 
 	render_year_buttons() {
@@ -173,7 +161,9 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.$years.find(".dashboard-page-year").on("click", (e) => {
 			this.selectedYear = String($(e.currentTarget).data("year"));
 			this.render_year_buttons();
+			this.render_kpis();
 			this.render_tables();
+			this.render_charts();
 		});
 	}
 
@@ -247,33 +237,63 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 	}
 
 	render_charts() {
-		Object.entries(this.charts).forEach(([key, chartName]) => {
+		const yearCharts = (this.context.chart_data_by_year || {})[this.selectedYear] || {};
+		Object.entries(this.charts).forEach(([key, meta]) => {
 			const $container = this.page.main.find(`[data-chart="${key}"]`);
-			this.mount_chart($container, chartName, 178);
+			this.render_chart_panel($container, yearCharts[key] || { labels: [], datasets: [{ values: [] }] }, meta);
 		});
 	}
 
-	mount_chart($container, chartName, height) {
-		$container.empty();
-		frappe.widget.make_widget({
-			widget_type: "chart",
-			container: $container,
-			label: chartName,
-			chart_name: chartName,
-			name: chartName,
-			height: height,
-			width: "Full",
-		});
+	render_chart_panel($container, chartData, meta) {
+		const labels = chartData.labels || [];
+		const values = ((chartData.datasets || [])[0] || {}).values || [];
+		const maxValue = values.length ? Math.max(...values, 0) : 0;
+		const totalValue = keyTotals(meta.totalLabel, values);
+
+		$container.html(`
+			<div class="dashboard-page-mini-chart">
+				<div class="dashboard-page-mini-chart-head">
+					<div class="is-month">${__("Month")}</div>
+					<div class="is-value">${frappe.utils.escape_html(meta.valueLabel)}</div>
+					<div class="is-bar"></div>
+				</div>
+				<div class="dashboard-page-mini-chart-body">
+					${labels
+						.map((label, index) => {
+							const value = Number(values[index] || 0);
+							const width = maxValue ? Math.max((value / maxValue) * 100, 4) : 0;
+							return `
+								<div class="dashboard-page-mini-chart-row">
+									<div class="is-month">${frappe.utils.escape_html(label)}</div>
+									<div class="is-value">${frappe.utils.escape_html(this.formatInteger(value))}</div>
+									<div class="is-bar">
+										<div class="dashboard-page-mini-chart-bar" style="width:${width}%"></div>
+									</div>
+								</div>
+							`;
+						})
+						.join("")}
+				</div>
+				<div class="dashboard-page-mini-chart-total">
+					<div class="is-month">${frappe.utils.escape_html(meta.totalLabel)}</div>
+					<div class="is-value">${frappe.utils.escape_html(this.formatInteger(totalValue))}</div>
+					<div class="is-bar"></div>
+				</div>
+			</div>
+		`);
+
+		function keyTotals(totalLabel, valuesList) {
+			if (totalLabel === "Макс") {
+				return valuesList.length ? Math.max(...valuesList, 0) : 0;
+			}
+			return valuesList.reduce((sum, value) => sum + Number(value || 0), 0);
+		}
 	}
 
-	mount_number_card($container, cardName) {
-		$container.empty();
-		frappe.widget.make_widget({
-			widget_type: "number_card",
-			container: $container,
-			label: cardName,
-			number_card_name: cardName,
-			name: cardName,
-		});
+	formatInteger(value) {
+		const sign = value < 0 ? "-" : "";
+		const numeric = Math.abs(Math.round(Number(value || 0)));
+		return `${sign}${String(numeric).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
 	}
+
 };

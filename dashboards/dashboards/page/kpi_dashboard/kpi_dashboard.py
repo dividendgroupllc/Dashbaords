@@ -66,7 +66,7 @@ def _period_clause(year: str, month: str | None = None, alias: str = "") -> tupl
 	return clause, params
 
 
-def _get_kpi_totals(year: str, month: str) -> dict[str, str]:
+def _get_kpi_totals(year: str, month: str | None) -> dict[str, str]:
 	invoice_clause, invoice_params = _period_clause(year, month)
 	item_clause, item_params = _period_clause(year, month, alias="si")
 
@@ -122,7 +122,7 @@ def _get_kpi_totals(year: str, month: str) -> dict[str, str]:
 	}
 
 
-def _get_client_metrics(year: str, month: str) -> list[dict[str, Any]]:
+def _get_client_metrics(year: str, month: str | None = None) -> list[dict[str, Any]]:
 	item_clause, item_params = _period_clause(year, month, alias="si")
 	invoice_clause, invoice_params = _period_clause(year, month)
 
@@ -204,9 +204,9 @@ def _get_client_metrics(year: str, month: str) -> list[dict[str, Any]]:
 	return sorted(clients, key=lambda row: row["sales"], reverse=True)
 
 
-def _build_client_rows(metrics: list[dict[str, Any]], limit: int = 10) -> list[list[str | bool]]:
+def _build_client_rows(metrics: list[dict[str, Any]]) -> list[list[str | bool]]:
 	rows: list[list[str | bool]] = []
-	for row in metrics[:limit]:
+	for row in metrics:
 		rows.append(
 			[
 				row["client"],
@@ -251,11 +251,11 @@ def _build_client_rows(metrics: list[dict[str, Any]], limit: int = 10) -> list[l
 	return rows
 
 
-def _build_summary_rows(metrics: list[dict[str, Any]], limit: int = 8) -> list[list[str | bool]]:
+def _build_summary_rows(metrics: list[dict[str, Any]]) -> list[list[str | bool]]:
 	total_sales = sum(row["sales"] for row in metrics) or 1
 	rows: list[list[str | bool]] = []
 
-	for row in metrics[:limit]:
+	for row in metrics:
 		rows.append(
 			[
 				row["client"],
@@ -281,10 +281,7 @@ def _build_summary_rows(metrics: list[dict[str, Any]], limit: int = 8) -> list[l
 	return rows
 
 
-def _build_aggregate_rows(metrics: list[dict[str, Any]], limit: int = 6) -> list[list[str | bool]]:
-	top_metrics = metrics[:limit]
-	other_metrics = metrics[limit:]
-
+def _build_aggregate_rows(metrics: list[dict[str, Any]]) -> list[list[str | bool]]:
 	def summarize(label: str, rows: list[dict[str, Any]], is_total: bool = False) -> list[str | bool]:
 		sales_total = sum(row["sales"] for row in rows)
 		net_margin = sum(row["net_margin"] for row in rows)
@@ -300,39 +297,51 @@ def _build_aggregate_rows(metrics: list[dict[str, Any]], limit: int = 6) -> list
 			result.append(True)
 		return result
 
-	rows = [summarize(f"Top {min(limit, len(metrics))} Clients", top_metrics)]
-	if other_metrics:
-		rows.append(summarize("Other Clients", other_metrics))
+	rows = [summarize("All Clients", metrics)]
 	rows.append(summarize("Total", metrics, is_total=True))
 	return rows
 
 
-def _build_treemap(metrics: list[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
-	top_metrics = metrics[:limit]
-	other_sales = sum(row["sales"] for row in metrics[limit:])
-	items = [{"label": row["client"], "value": round(row["sales"])} for row in top_metrics]
-	if other_sales:
-		items.append({"label": "Others", "value": round(other_sales)})
-	return items
+def _build_treemap(metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	top_metrics = sorted(
+		[row for row in metrics if max(row["net_margin"], 0) > 0],
+		key=lambda row: row["net_margin"],
+		reverse=True,
+	)[:10]
+	total_net_margin = sum(max(row["net_margin"], 0) for row in top_metrics)
+
+	if not total_net_margin:
+		return []
+
+	return [
+		{
+			"client_name": row["client"],
+			"net_profit_margin_amount": round(max(row["net_margin"], 0)),
+			"share": (max(row["net_margin"], 0) / total_net_margin) * 100,
+		}
+		for row in top_metrics
+	]
 
 
 @frappe.whitelist()
 def get_kpi_dashboard_data(year: str | None = None, month: str | None = None):
 	default_year, default_month = get_default_period(year)
-	selected_year = year if year in get_dashboard_years() else default_year
+	available_years = get_dashboard_years()
+	selected_year = year if year in available_years else default_year
 	selected_month = month if month in MONTH_LABELS else default_month
 
-	client_metrics = _get_client_metrics(selected_year, selected_month)
+	monthly_metrics = _get_client_metrics(selected_year, selected_month)
+	yearly_metrics = _get_client_metrics(selected_year)
 
 	return {
 		"title": "KPI",
-		"years": get_dashboard_years(),
+		"years": available_years,
 		"months": MONTH_LABELS,
 		"selected_year": selected_year,
 		"selected_month": selected_month,
 		"kpi_totals": _get_kpi_totals(selected_year, selected_month),
-		"client_rows": _build_client_rows(client_metrics),
-		"summary_rows": _build_summary_rows(client_metrics),
-		"aggregate_rows": _build_aggregate_rows(client_metrics),
-		"treemap": _build_treemap(client_metrics),
+		"client_rows": _build_client_rows(monthly_metrics),
+		"summary_rows": _build_client_rows(yearly_metrics),
+		"aggregate_rows": _build_aggregate_rows(yearly_metrics),
+		"treemap": _build_treemap(monthly_metrics),
 	}

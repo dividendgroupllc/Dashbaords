@@ -19,4 +19,5 @@ def get_data(
     time_interval=None,
     heatmap_year=None,
 ):
-    return get_avg_cost_chart_data()
+    parsed_filters = frappe.parse_json(filters) if filters and not isinstance(filters, dict) else (filters or {})
+    return get_avg_cost_chart_data(parsed_filters.get("year"))

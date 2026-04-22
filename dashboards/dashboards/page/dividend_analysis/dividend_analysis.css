@@ -145,6 +145,9 @@
 }
 
 .dividend-analysis-card {
+	display: flex;
+	flex-direction: column;
+	height: 300px;
 	border: 1px solid #d8d8d8;
 	border-radius: 0;
 	background: #fff;
@@ -152,7 +155,7 @@
 }
 
 .dividend-analysis-card--stretch {
-	height: 100%;
+	height: 300px;
 }
 
 .dividend-analysis-card-head {
@@ -182,9 +185,10 @@
 }
 
 .dividend-analysis-table-wrap {
+	flex: 1;
+	min-height: 0;
 	padding: 4px 8px 10px;
 	overflow: auto;
-	max-height: calc(100vh - 220px);
 }
 
 .dividend-analysis-table {
@@ -230,6 +234,9 @@
 }
 
 .dividend-analysis-table tr.is-total td {
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
 	border-top: 2px solid #d6d6d6;
 	color: #1f1f1f;
 	font-weight: 800;
@@ -244,6 +251,39 @@
 
 .dividend-analysis-table--dense {
 	font-size: 11px;
+}
+
+.dividend-analysis-card[data-card="investor-totals"] {
+	height: 300px;
+}
+
+.dividend-analysis-investor-total-title {
+	padding: 6px 8px 2px;
+	color: #b05a65;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+}
+
+.dividend-analysis-table-wrap--investor-totals {
+	padding: 2px 8px 8px;
+}
+
+.dividend-analysis-table--investor-totals {
+	font-size: 12px;
+}
+
+.dividend-analysis-table--investor-totals th {
+	font-size: 14px;
+}
+
+.dividend-analysis-table--investor-totals th:first-child {
+	width: 78px;
+}
+
+.dividend-analysis-table--investor-totals td:first-child {
+	color: #565656;
 }
 
 @media (max-width: 1280px) {

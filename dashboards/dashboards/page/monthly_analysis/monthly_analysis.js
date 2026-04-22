@@ -82,9 +82,12 @@ dashboards.ui.MonthlyAnalysisPage = class MonthlyAnalysisPage {
 
 	render_years() {
 		const years = this.context.years || [];
+		const hasOverflow = years.length > 6;
+		const stripClass = hasOverflow ? "is-scrollable" : "is-centered";
 		this.$years.html(
 			`
-				<div class="monthly-analysis-year-group">
+				<div class="monthly-analysis-year-group-wrap ${stripClass}">
+					<div class="monthly-analysis-year-group">
 					${years
 						.map(
 							(year) => `
@@ -94,8 +97,8 @@ dashboards.ui.MonthlyAnalysisPage = class MonthlyAnalysisPage {
 							`
 						)
 						.join("")}
+					</div>
 				</div>
-				<div class="monthly-analysis-year-spinner" aria-hidden="true"><span></span><span></span></div>
 			`
 		);
 
@@ -136,4 +139,3 @@ dashboards.ui.MonthlyAnalysisPage = class MonthlyAnalysisPage {
 		`);
 	}
 };
-

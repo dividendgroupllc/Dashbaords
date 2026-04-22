@@ -108,23 +108,39 @@ dashboards.ui.DividendAnalysisPage = class DividendAnalysisPage {
 	}
 
 	render_investor_totals_card() {
-		const investors = this.context.investors || [];
 		const years = this.context.years || [];
-		const totals = this.context.investor_totals_by_year || {};
-		const rows = investors.map((investor) => ({
-			label: investor.label,
-			values: (totals[investor.key] || []).map((value) => String(value || "0")),
-			meta: investor.display_name || investor.label,
-		}));
+		const rows = this.build_simple_rows(this.context.investor_monthly_totals_by_year || {});
+		const $card = this.page.main.find('[data-card="investor-totals"]');
 
-		this.render_year_matrix_card({
-			card: "investor-totals",
-			title: "Month",
-			subtitle: "Инвесторга умумий қолган сумма",
-			columns: years,
-			rows,
-			metaColumnLabel: __("Investor"),
-		});
+		$card.html(`
+			<div class="dividend-analysis-investor-total-title">
+				Инвесторла умумий олган суммаси йиллар ва ойма ой куринишда
+			</div>
+			<div class="dividend-analysis-table-wrap dividend-analysis-table-wrap--investor-totals">
+				<table class="dividend-analysis-table dividend-analysis-table--investor-totals">
+					<thead>
+						<tr>
+							<th>Month</th>
+							${years.map((year) => `<th>${frappe.utils.escape_html(String(year))}</th>`).join("")}
+						</tr>
+					</thead>
+					<tbody>
+						${rows
+							.map(
+								(row) => `
+									<tr class="${row.is_total ? "is-total" : ""}">
+										<td>${frappe.utils.escape_html(row.label || "")}</td>
+										${(row.values || [])
+											.map((value) => `<td class="is-number">${frappe.utils.escape_html(String(value || "0"))}</td>`)
+											.join("")}
+									</tr>
+								`
+							)
+							.join("")}
+					</tbody>
+				</table>
+			</div>
+		`);
 	}
 
 	render_breakdown_card() {

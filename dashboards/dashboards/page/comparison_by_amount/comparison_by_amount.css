@@ -48,16 +48,18 @@
 
 .comparison-by-amount-panel {
 	min-width: 0;
+	height: clamp(320px, calc(100vh - 150px), 720px);
 	border-top: 1px solid #dedede;
 	border-left: 1px solid #dedede;
 	border-right: 1px solid #dedede;
 	background: #fff;
 	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
 }
 
 .comparison-by-amount-table-wrap {
 	overflow: auto;
-	max-height: 560px;
+	height: 100%;
 }
 
 .comparison-by-amount-table {
@@ -121,9 +123,18 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.comparison-by-amount-total-cell {
+	font-weight: 800;
+}
+
 .comparison-by-amount-table tr.is-total td {
 	color: #2c2c2c;
 	font-weight: 800;
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	background: #fff;
+	border-top: 2px solid #97c997;
 }
 
 .comparison-by-amount-table tr.is-total td.is-number {
@@ -139,8 +150,8 @@
 		grid-template-columns: 1fr;
 	}
 
-	.comparison-by-amount-table-wrap {
-		max-height: none;
+	.comparison-by-amount-panel {
+		height: clamp(280px, calc(100vh - 260px), 520px);
 	}
 }
 

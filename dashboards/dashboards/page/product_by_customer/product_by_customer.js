@@ -13,8 +13,11 @@ dashboards.ui.ProductByCustomerPage = class ProductByCustomerPage {
 			single_column: true,
 		});
 		this.selectedCustomer = null;
+		this.handleResize = () => this.syncScrollHeight();
 
 		this.make_layout();
+		$(window).off("resize.product-by-customer", this.handleResize);
+		$(window).on("resize.product-by-customer", this.handleResize);
 		this.load_context();
 	}
 
@@ -75,6 +78,7 @@ dashboards.ui.ProductByCustomerPage = class ProductByCustomerPage {
 		this.$subtitle.text(this.context.subtitle || "");
 		this.render_meta();
 		this.render_months();
+		this.syncScrollHeight();
 	}
 
 	render_customer_selector() {
@@ -138,6 +142,10 @@ dashboards.ui.ProductByCustomerPage = class ProductByCustomerPage {
 					<div class="product-by-customer-empty-copy">${__("No comparison data is available for the current period.")}</div>
 				</div>
 			`);
+			this.$content.css({
+				height: "",
+				"max-height": "",
+			});
 			return;
 		}
 
@@ -146,6 +154,31 @@ dashboards.ui.ProductByCustomerPage = class ProductByCustomerPage {
 				${months.map((month) => this.render_month(month)).join("")}
 			</div>
 		`);
+	}
+
+	syncScrollHeight() {
+		const $scroll = this.$content.find(".product-by-customer-scroll");
+		if (!$scroll.length) {
+			return;
+		}
+
+		window.requestAnimationFrame(() => {
+			const contentRect = this.$content.get(0)?.getBoundingClientRect();
+			if (!contentRect) {
+				return;
+			}
+
+			const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+			const bottomGap = 16;
+			const minHeight = 320;
+			const availableHeight = Math.floor(viewportHeight - contentRect.top - bottomGap);
+			const nextHeight = Math.max(availableHeight, minHeight);
+
+			$scroll.css({
+				height: `${nextHeight}px`,
+				"max-height": `${nextHeight}px`,
+			});
+		});
 	}
 
 	render_month(month) {

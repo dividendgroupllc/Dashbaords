@@ -100,6 +100,7 @@
 
 .kpi-dashboard-filter-card,
 .kpi-dashboard-card {
+	min-width: 0;
 	padding: 8px;
 	border: 1px solid #d6dbd4;
 	border-radius: 4px;
@@ -116,15 +117,18 @@
 }
 
 .kpi-dashboard-year-list {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 6px;
+	max-height: 70px;
+	overflow: auto;
+	padding-right: 2px;
 }
 
 .kpi-dashboard-month-list {
 	display: grid;
 	gap: 4px;
-	max-height: 460px;
+	height: 390px;
 	overflow: auto;
 	padding-right: 2px;
 }
@@ -147,8 +151,8 @@
 }
 
 .kpi-dashboard-year {
-	width: auto;
-	min-width: 48px;
+	width: 100%;
+	min-width: 0;
 	justify-content: center;
 }
 
@@ -219,7 +223,23 @@
 
 .kpi-dashboard-table-wrap {
 	width: 100%;
+	max-width: 100%;
 	overflow: auto;
+	padding-right: 2px;
+}
+
+.kpi-dashboard-table-wrap--monthly {
+	max-height: 250px;
+}
+
+.kpi-dashboard-table-wrap--yearly {
+	max-height: 200px;
+	overflow-x: auto;
+	overflow-y: auto;
+}
+
+.kpi-dashboard-table-wrap--yearly .kpi-dashboard-table {
+	min-width: 900px;
 }
 
 .kpi-dashboard-table {
@@ -230,8 +250,12 @@
 }
 
 .kpi-dashboard-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 	padding: 4px 5px 6px;
 	border-bottom: 1px solid #d0d8d0;
+	background: linear-gradient(180deg, #ffffff 0%, #f3f5f2 100%);
 	color: #118b39;
 	font-size: 10px;
 	font-weight: 800;
@@ -250,6 +274,21 @@
 	text-overflow: ellipsis;
 }
 
+.kpi-dashboard-table tfoot td {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
+	padding: 4px 5px;
+	border-top: 1px solid rgba(17, 139, 57, 0.18);
+	background: linear-gradient(180deg, #edf9f0 0%, #dff3e4 100%);
+	box-shadow: 0 -6px 12px rgba(20, 78, 33, 0.08);
+	color: #176d32;
+	font-weight: 800;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .kpi-dashboard-table .is-text {
 	text-align: left;
 	color: #238a3f;
@@ -260,16 +299,12 @@
 	text-align: right;
 }
 
-.kpi-dashboard-table tbody tr.is-total td {
-	background: rgba(14, 152, 60, 0.07);
-	color: #176d32;
-	font-weight: 800;
-}
-
 .kpi-dashboard-table--wide thead th:first-child,
 .kpi-dashboard-table--wide tbody td:first-child,
+.kpi-dashboard-table--wide tfoot td:first-child,
 .kpi-dashboard-table--compact thead th:first-child,
-.kpi-dashboard-table--compact tbody td:first-child {
+.kpi-dashboard-table--compact tbody td:first-child,
+.kpi-dashboard-table--compact tfoot td:first-child {
 	text-align: left;
 }
 
@@ -277,22 +312,31 @@
 	display: grid;
 	grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
 	gap: 10px;
+	align-items: stretch;
+}
+
+.kpi-dashboard-bottom > .kpi-dashboard-card {
+	width: 100%;
+	min-width: 0;
 }
 
 .kpi-dashboard-treemap {
-	display: flex;
+	position: relative;
 	min-height: 214px;
 	border-radius: 4px;
 	overflow: hidden;
 	background: #eff3f0;
+	isolation: isolate;
 }
 
 .kpi-dashboard-treemap-item {
+	position: absolute;
 	display: flex;
 	flex-direction: column;
-	justify-content: space-between;
+	justify-content: flex-start;
 	min-width: 0;
-	padding: 10px 8px;
+	min-height: 0;
+	padding: 8px 7px;
 	color: #fff;
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
@@ -301,12 +345,23 @@
 	font-size: 12px;
 	font-weight: 800;
 	line-height: 1.1;
+	word-break: break-word;
 }
 
-.kpi-dashboard-treemap-value {
-	font-size: 12px;
-	font-weight: 700;
-	opacity: 0.96;
+.kpi-dashboard-treemap-item.is-compact {
+	padding: 6px 5px;
+}
+
+.kpi-dashboard-treemap-item.is-compact .kpi-dashboard-treemap-name {
+	font-size: 10px;
+}
+
+.kpi-dashboard-treemap-item.is-tiny {
+	padding: 4px;
+}
+
+.kpi-dashboard-treemap-item.is-tiny .kpi-dashboard-treemap-name {
+	display: none;
 }
 
 @media (max-width: 1360px) {

@@ -93,6 +93,8 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 	render_static_regions() {
 		this.render_tabs();
+		this.render_main_timeline();
+		this.render_mini_timeline();
 		this.render_summary_table();
 		this.render_side_metrics();
 		this.render_footer();
@@ -223,9 +225,6 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	}
 
 	render_widgets() {
-		this.mount_chart(this.$mainChart, this.widget_names.main_chart, 314);
-		this.mount_chart(this.$miniChart, this.widget_names.mini_chart, 126);
-
 		Object.entries(this.widget_names).forEach(([key, widgetName]) => {
 			if (key === "main_chart" || key === "mini_chart") {
 				return;
@@ -241,6 +240,178 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				this.mount_number_card($slot, widgetName);
 			}
 		});
+	}
+
+	render_main_timeline() {
+		const years = this.context.timeline_years || [];
+		const flattenedValues = years.flatMap((year) => year.values || []);
+		const maxValue = flattenedValues.length ? Math.max(...flattenedValues, 0) : 0;
+		const chartScale = this.getChartScale(maxValue);
+		const yTicks = this.buildTickValues(chartScale);
+
+		this.$mainChart.html(`
+			<div class="main-dashboard-timeline">
+				<div class="main-dashboard-timeline-grid">
+					${yTicks
+						.map(
+							(tick) => `
+								<div class="main-dashboard-timeline-line" style="bottom:${tick.percent}%">
+									<div class="main-dashboard-timeline-tick">${frappe.utils.escape_html(tick.label)}</div>
+								</div>
+							`
+						)
+						.join("")}
+				</div>
+				<div class="main-dashboard-timeline-years">
+					${years
+						.map((year) => this.render_timeline_year(year, chartScale.max))
+						.join("")}
+				</div>
+			</div>
+		`);
+	}
+
+	render_timeline_year(year, maxValue) {
+		const months = [
+			"January",
+			"February",
+			"March",
+			"April",
+			"May",
+			"June",
+			"July",
+			"August",
+			"September",
+			"October",
+			"November",
+			"December",
+		];
+
+		return `
+			<div class="main-dashboard-timeline-year">
+				<div class="main-dashboard-timeline-months">
+					${months
+						.map((month, index) => {
+							const value = Number((year.values || [])[index] || 0);
+							const height = this.getBarHeightPercent(value, maxValue, { minPositivePercent: 1 });
+							return `
+								<div class="main-dashboard-timeline-month">
+									<div class="main-dashboard-timeline-value">${frappe.utils.escape_html(this.formatCompactNumber(value))}</div>
+									<div class="main-dashboard-timeline-bar-wrap">
+										<div class="main-dashboard-timeline-bar" style="height:${height}%"></div>
+									</div>
+									<div class="main-dashboard-timeline-label">${frappe.utils.escape_html(month)}</div>
+								</div>
+							`;
+						})
+						.join("")}
+				</div>
+				<div class="main-dashboard-timeline-year-label">${frappe.utils.escape_html(String(year.year || ""))}</div>
+			</div>
+		`;
+	}
+
+	render_mini_timeline() {
+		const years = this.context.mini_timeline_years || [];
+		const monthLabels = [
+			"January",
+			"February",
+			"March",
+			"April",
+			"May",
+			"June",
+			"July",
+			"August",
+			"September",
+			"October",
+			"November",
+			"December",
+		];
+		const maxValue = years.length ? Math.max(...years.flatMap((year) => year.values || []), 0) : 0;
+		const chartScale = this.getChartScale(maxValue);
+		const palette = ["is-older", "is-middle", "is-latest"];
+
+		this.$miniChart.html(`
+			<div class="main-dashboard-mini-timeline">
+				<div class="main-dashboard-mini-timeline-grid">
+					${this.buildTickValues(chartScale)
+						.map(
+							(tick) => `
+								<div class="main-dashboard-mini-timeline-line" style="bottom:${tick.percent}%">
+									<div class="main-dashboard-mini-timeline-tick">${frappe.utils.escape_html(tick.label)}</div>
+								</div>
+							`
+						)
+						.join("")}
+				</div>
+				<div class="main-dashboard-mini-timeline-groups">
+					${monthLabels
+						.map((month, monthIndex) => {
+							return `
+								<div class="main-dashboard-mini-timeline-group">
+									<div class="main-dashboard-mini-timeline-bars">
+										${years
+											.map((year, yearIndex) => {
+												const value = Number((year.values || [])[monthIndex] || 0);
+												const height = this.getBarHeightPercent(value, chartScale.max);
+												const toneClass = palette[yearIndex] || "is-latest";
+												return `
+													<div class="main-dashboard-mini-timeline-bar-wrap">
+														<div
+															class="main-dashboard-mini-timeline-bar ${toneClass}"
+															title="${frappe.utils.escape_html(String(year.year || ""))}: ${frappe.utils.escape_html(
+																this.formatNumber(value)
+															)}"
+															style="height:${height}%"
+														></div>
+													</div>
+												`;
+											})
+											.join("")}
+									</div>
+									<div class="main-dashboard-mini-timeline-label">${frappe.utils.escape_html(month)}</div>
+								</div>
+							`;
+						})
+						.join("")}
+				</div>
+			</div>
+		`);
+	}
+
+	getChartScale(maxValue, tickCount = 3) {
+		const safeMax = maxValue > 0 ? maxValue : 1;
+		const roughStep = safeMax / tickCount;
+		const magnitude = 10 ** Math.floor(Math.log10(roughStep || 1));
+		const normalizedStep = roughStep / magnitude;
+		const stepCandidates = [1, 2, 2.5, 5, 10];
+		const roundedStep = stepCandidates.find((candidate) => normalizedStep <= candidate) || 10;
+		const step = Math.max(roundedStep * magnitude, 1);
+		const chartMax = Math.max(step * tickCount, safeMax);
+		return { max: chartMax, step, tickCount };
+	}
+
+	buildTickValues(chartScale) {
+		const { max, step, tickCount } = chartScale;
+		return Array.from({ length: tickCount + 1 }, (_, index) => {
+			const value = step * index;
+			return {
+				value,
+				label: this.formatAxisNumber(value),
+				percent: (value / max) * 100,
+			};
+		});
+	}
+
+	getBarHeightPercent(value, chartMax, options = {}) {
+		const numericValue = Number(value || 0);
+		const minPositivePercent = Number(options.minPositivePercent || 0);
+		if (!chartMax || numericValue <= 0) {
+			return 0;
+		}
+
+		const rawPercent = (numericValue / chartMax) * 100;
+		return minPositivePercent ? Math.max(rawPercent, minPositivePercent) : rawPercent;
 	}
 
 	mount_chart($container, chartName, height) {
@@ -270,5 +441,28 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	formatNumber(value) {
 		const numericValue = Number(value || 0);
 		return numericValue.toLocaleString("en-US").replace(/,/g, " ");
+	}
+
+	formatCompactNumber(value) {
+		const numericValue = Number(value || 0);
+		if (!numericValue) {
+			return "0";
+		}
+		if (Math.abs(numericValue) >= 1000) {
+			const compact = numericValue / 1000;
+			return `${Number.isInteger(compact) ? compact : compact.toFixed(1).replace(/\.0$/, "")}K`;
+		}
+		return this.formatNumber(numericValue);
+	}
+
+	formatAxisNumber(value) {
+		const numericValue = Number(value || 0);
+		if (!numericValue) {
+			return "0K";
+		}
+		if (Math.abs(numericValue) >= 1000) {
+			return `${Math.round(numericValue / 1000)}K`;
+		}
+		return `${Math.round(numericValue)}`;
 	}
 };

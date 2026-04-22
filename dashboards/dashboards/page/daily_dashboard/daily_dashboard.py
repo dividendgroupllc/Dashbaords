@@ -137,7 +137,6 @@ def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[st
 		{client_clause}
 		GROUP BY COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item')
 		ORDER BY sales DESC, item ASC
-		LIMIT 20
 		""",
 		params,
 		as_dict=True,
@@ -171,7 +170,7 @@ def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[st
 def get_dashboard_context(year: str | None = None, month: str | None = None, client: str | None = None):
 	selected_year, selected_month = _normalize_filters(year, month)
 	clients = _get_clients(selected_year, selected_month)
-	selected_client = client if client in clients else (clients[0] if clients else None)
+	selected_client = client if client in clients else None
 
 	calendar_values = _get_calendar_values(selected_year, selected_month, selected_client)
 	product_rows = _get_product_rows(selected_year, selected_month, selected_client)

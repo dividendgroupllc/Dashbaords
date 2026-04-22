@@ -47,10 +47,41 @@
 	background: linear-gradient(180deg, #f8f8f8 0%, #ededed 100%);
 }
 
+.monthly-analysis-year-group-wrap {
+	max-width: 100%;
+}
+
+.monthly-analysis-year-group-wrap.is-centered {
+	overflow: visible;
+}
+
+.monthly-analysis-year-group-wrap.is-scrollable {
+	width: fit-content;
+	max-width: calc((72px * 6) + (8px * 5) + 20px);
+	max-height: 38px;
+	margin: 0 auto;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scrollbar-width: thin;
+}
+
 .monthly-analysis-year-group {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	padding: 0 10px;
+}
+
+.monthly-analysis-year-group-wrap.is-centered .monthly-analysis-year-group {
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+.monthly-analysis-year-group-wrap.is-scrollable .monthly-analysis-year-group {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(72px, auto));
+	justify-content: center;
+	align-items: start;
 }
 
 .monthly-analysis-year-pill {
@@ -75,6 +106,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 3px;
+	flex: 0 0 auto;
+	margin-right: 10px;
 }
 
 .monthly-analysis-year-spinner span {
@@ -159,6 +192,11 @@
 	color: #2c2c2c;
 	font-weight: 800;
 	background: #fff;
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	border-top: 2px solid #97c997;
+	border-bottom: 0;
 }
 
 .monthly-analysis-table tr.is-total td.is-number {
@@ -174,10 +212,16 @@
 @media (max-width: 768px) {
 	.monthly-analysis-year-strip {
 		flex-direction: column;
+		align-items: stretch;
 	}
 
-	.monthly-analysis-year-group {
-		flex-wrap: wrap;
-		justify-content: center;
+	.monthly-analysis-year-group-wrap {
+		width: auto;
+		max-width: 100%;
+	}
+
+	.monthly-analysis-year-group-wrap.is-centered .monthly-analysis-year-group,
+	.monthly-analysis-year-group-wrap.is-scrollable .monthly-analysis-year-group {
+		justify-content: flex-start;
 	}
 }

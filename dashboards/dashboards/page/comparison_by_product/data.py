@@ -175,6 +175,7 @@ def _get_customer_year_tables(years: list[int], month_limit: int) -> list[dict[s
 def get_dashboard_context() -> dict[str, Any]:
     reference_date = get_reference_month_date()
     years = _get_years(limit=4)
+    customer_years = years[-2:]
     month_limit = cint(reference_date.month) or 1
 
     return {
@@ -184,5 +185,5 @@ def get_dashboard_context() -> dict[str, Any]:
         "reference_year": str(reference_date.year),
         "product_title": "Предметы кг",
         "product_rows": _get_product_rows(years, month_limit),
-        "customer_tables": _get_customer_year_tables(years, month_limit),
+        "customer_tables": _get_customer_year_tables(customer_years, month_limit),
     }

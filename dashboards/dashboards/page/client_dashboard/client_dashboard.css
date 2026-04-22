@@ -105,12 +105,17 @@
 
 .client-dashboard-table .total-row {
 	background-color: #fff !important;
-	border-top: 2px solid #333;
 }
 
 .client-dashboard-table .total-row td {
+	position: sticky;
+	bottom: 0;
 	padding: 10px 15px;
+	border-top: 2px solid #333;
+	border-bottom: 0;
+	background: #fff;
 	font-size: 14px;
+	z-index: 1;
 }
 
 @media (max-width: 1200px) {

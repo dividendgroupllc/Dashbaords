@@ -74,17 +74,24 @@ dashboards.ui.SalesDashboardPage = class SalesDashboardPage {
 
 	render_years() {
 		const years = this.context.years || [];
+		const hasOverflow = years.length > 6;
+		const wrapClass = hasOverflow ? "is-scrollable" : "is-centered";
 		this.$years.html(
-			years
-				.map(
-					(year) => `
-						<button class="sales-dashboard-chip sales-dashboard-chip--year ${year === this.state.year ? "is-active" : ""}" data-year="${year}">
-							${frappe.utils.escape_html(year)}
-						</button>
-					`
-				)
-				.join("") +
-				`<div class="sales-dashboard-year-spinner"><span></span><span></span></div>`
+			`
+				<div class="sales-dashboard-year-group-wrap ${wrapClass}">
+					<div class="sales-dashboard-year-group">
+						${years
+							.map(
+								(year) => `
+									<button class="sales-dashboard-chip sales-dashboard-chip--year ${year === this.state.year ? "is-active" : ""}" data-year="${year}">
+										${frappe.utils.escape_html(year)}
+									</button>
+								`
+							)
+							.join("")}
+					</div>
+				</div>
+			`
 		);
 
 		this.$years.find("[data-year]").on("click", (e) => {

@@ -143,6 +143,7 @@ dashboards.ui.ComparisonByWeightPage = class ComparisonByWeightPage {
 								`
 							)
 							.join("")}
+						<th colspan="2">${frappe.utils.escape_html(this.context.total_title || "Total")}</th>
 					</tr>
 					<tr>
 						<th class="comparison-by-weight-name comparison-by-weight-name--item">${frappe.utils.escape_html(
@@ -156,6 +157,8 @@ dashboards.ui.ComparisonByWeightPage = class ComparisonByWeightPage {
 								`
 							)
 							.join("")}
+						<th>${frappe.utils.escape_html(this.context.total_qty_title || "KG")}</th>
+						<th>${frappe.utils.escape_html(this.context.total_avg_title || "Сред цена")}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -167,6 +170,8 @@ dashboards.ui.ComparisonByWeightPage = class ComparisonByWeightPage {
 										row.label || ""
 									)}</td>
 									${(row.values || []).map((value) => `<td class="is-number">${frappe.utils.escape_html(String(value || ""))}</td>`).join("")}
+									<td class="is-number comparison-by-weight-total-cell">${frappe.utils.escape_html(String(row.total_qty || ""))}</td>
+									<td class="is-number comparison-by-weight-total-cell">${frappe.utils.escape_html(String(row.total_avg || ""))}</td>
 								</tr>
 							`
 						)

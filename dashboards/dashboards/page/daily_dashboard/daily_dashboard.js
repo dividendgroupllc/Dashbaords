@@ -20,6 +20,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		};
 
 		this.make_layout();
+		this.bind_events();
 		this.load_context();
 	}
 
@@ -68,10 +69,17 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		this.$years = this.page.main.find('[data-region="years"]');
 		this.$months = this.page.main.find('[data-region="months"]');
 		this.$clients = this.page.main.find('[data-region="clients"]');
+		this.$content = this.page.main.find(".daily-dashboard-content");
+		this.$calendarPanel = this.page.main.find(".daily-dashboard-calendar-panel");
+		this.$tablePanel = this.page.main.find(".daily-dashboard-table-panel");
 		this.$calendarTitle = this.page.main.find('[data-region="calendar-title"]');
 		this.$weekdays = this.page.main.find('[data-region="weekdays"]');
 		this.$calendar = this.page.main.find('[data-region="calendar"]');
 		this.$table = this.page.main.find('[data-region="table"]');
+	}
+
+	bind_events() {
+		$(window).on("resize.daily-dashboard", () => this.sync_panel_heights());
 	}
 
 	load_context(filters = {}) {
@@ -98,6 +106,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		this.render_clients();
 		this.render_calendar();
 		this.render_table();
+		this.sync_panel_heights();
 	}
 
 	render_years() {
@@ -111,8 +120,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 						</button>
 					`
 				)
-				.join("") +
-				`<div class="daily-dashboard-year-spinner"><span></span><span></span></div>`
+				.join("")
 		);
 
 		this.$years.find("[data-year]").on("click", (e) => {
@@ -162,8 +170,9 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		);
 
 		this.$clients.find("[data-client]").on("click", (e) => {
+			const client = String($(e.currentTarget).data("client"));
 			this.load_context({
-				client: String($(e.currentTarget).data("client")),
+				client: client === this.state.client ? null : client,
 			});
 		});
 	}
@@ -204,43 +213,67 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		const total = this.buildTotalRow(rows);
 		const headers = ["Предметы", "КГ", "Сумма.прод", "Сумма себест", "Маржа", "РСП сумма", "рен", "ЧП", "ЧП рен"];
 
-		this.$table.html(`
-			<table class="daily-dashboard-table">
-				<thead>
-					<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
-				</thead>
-				<tbody>
-					${rows
-						.map(
-							(row) => `
-								<tr>
-									<td class="is-text">${frappe.utils.escape_html(row.item)}</td>
-									<td class="is-number">${this.formatInteger(row.kg)}</td>
-									<td class="is-number">${this.formatInteger(row.sales)}</td>
-									<td class="is-number">${this.formatInteger(row.cost)}</td>
-									<td class="is-number">${this.formatInteger(row.margin)}</td>
-									<td class="is-number">${this.formatInteger(row.rsp)}</td>
-									<td class="is-number">${this.formatPercent(row.profitability)}</td>
-									<td class="is-number">${this.formatInteger(row.np)}</td>
-									<td class="is-number">${this.formatSignedPercent(row.np_profitability)}</td>
-								</tr>
-							`
-						)
-						.join("")}
-					<tr class="is-total">
-						<td class="is-text">Total</td>
-						<td class="is-number">${this.formatInteger(total.kg)}</td>
-						<td class="is-number">${this.formatInteger(total.sales)}</td>
-						<td class="is-number">${this.formatInteger(total.cost)}</td>
-						<td class="is-number">${this.formatInteger(total.margin)}</td>
-						<td class="is-number">${this.formatInteger(total.rsp)}</td>
-						<td class="is-number">${this.formatPercent(total.profitability)}</td>
-						<td class="is-number">${this.formatInteger(total.np)}</td>
-						<td class="is-number">${this.formatSignedPercent(total.np_profitability)}</td>
-					</tr>
-				</tbody>
-			</table>
-		`);
+			this.$table.html(`
+				<div class="daily-dashboard-table-scroll">
+					<table class="daily-dashboard-table">
+						<thead>
+							<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
+						</thead>
+						<tbody>
+						${rows
+							.map(
+								(row) => `
+									<tr>
+										<td class="is-text">${frappe.utils.escape_html(row.item)}</td>
+										<td class="is-number">${this.formatInteger(row.kg)}</td>
+										<td class="is-number">${this.formatInteger(row.sales)}</td>
+										<td class="is-number">${this.formatInteger(row.cost)}</td>
+										<td class="is-number">${this.formatInteger(row.margin)}</td>
+										<td class="is-number">${this.formatInteger(row.rsp)}</td>
+										<td class="is-number">${this.formatPercent(row.profitability)}</td>
+										<td class="is-number">${this.formatInteger(row.np)}</td>
+										<td class="is-number">${this.formatSignedPercent(row.np_profitability)}</td>
+									</tr>
+								`
+							)
+							.join("")}
+						</tbody>
+					</table>
+				</div>
+				<div class="daily-dashboard-table-total">
+					<table class="daily-dashboard-table daily-dashboard-table--total">
+						<tfoot>
+							<tr class="is-total">
+								<td class="is-text">Total</td>
+								<td class="is-number">${this.formatInteger(total.kg)}</td>
+								<td class="is-number">${this.formatInteger(total.sales)}</td>
+								<td class="is-number">${this.formatInteger(total.cost)}</td>
+								<td class="is-number">${this.formatInteger(total.margin)}</td>
+								<td class="is-number">${this.formatInteger(total.rsp)}</td>
+								<td class="is-number">${this.formatPercent(total.profitability)}</td>
+								<td class="is-number">${this.formatInteger(total.np)}</td>
+								<td class="is-number">${this.formatSignedPercent(total.np_profitability)}</td>
+							</tr>
+						</tfoot>
+					</table>
+				</div>
+			`);
+	}
+
+	sync_panel_heights() {
+		if (!this.$calendarPanel || !this.$tablePanel) {
+			return;
+		}
+
+		if (window.innerWidth <= 1200) {
+			this.$tablePanel.css("height", "");
+			return;
+		}
+
+		window.requestAnimationFrame(() => {
+			const calendarHeight = this.$calendarPanel.outerHeight();
+			this.$tablePanel.css("height", calendarHeight ? `${calendarHeight}px` : "");
+		});
 	}
 
 	getActiveDate() {

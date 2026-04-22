@@ -121,6 +121,12 @@
 }
 
 .comparison-by-product-table tr.is-total td {
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	background: #fcfcfc;
+	border-top: 2px solid #97c997;
+	border-bottom: 0;
 	color: #2c2c2c;
 	font-weight: 800;
 }

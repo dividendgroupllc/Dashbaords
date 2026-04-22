@@ -194,6 +194,44 @@ def get_investor_totals_by_years(years: list[str], investors: list[dict[str, Any
     }
 
 
+def get_investor_monthly_totals_by_years(years: list[str], investors: list[dict[str, Any]]) -> dict[str, list[str]]:
+    values = _empty_year_month_map(years)
+    customers = tuple(investor["customer"] for investor in investors if investor.get("customer"))
+
+    if not customers:
+        return {
+            year: [format_number(values[year][month_no]) for month_no in range(1, 13)] for year in years
+        }
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            YEAR(posting_date) AS year,
+            MONTH(posting_date) AS month_no,
+            SUM(COALESCE(outstanding_amount, 0)) AS amount
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND COALESCE(is_return, 0) = 0
+          AND YEAR(posting_date) IN %(years)s
+          AND customer IN %(customers)s
+        GROUP BY YEAR(posting_date), MONTH(posting_date)
+        ORDER BY YEAR(posting_date), MONTH(posting_date)
+        """,
+        {
+            "years": tuple(int(year) for year in years),
+            "customers": customers,
+        },
+        as_dict=True,
+    )
+
+    for row in rows:
+        values[str(row.year)][row.month_no] = flt(row.amount)
+
+    return {
+        year: [format_number(values[year][month_no]) for month_no in range(1, 13)] for year in years
+    }
+
+
 def get_investor_monthly_breakdown(years: list[str], investors: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     result = {year: [] for year in years}
     customer_map = {investor["customer"]: investor["key"] for investor in investors if investor.get("customer")}
@@ -275,6 +313,7 @@ def get_dashboard_snapshot() -> dict[str, Any]:
         "average_by_year": get_average_outstanding_by_years(years),
         "invoice_count_by_year": get_invoice_count_by_years(years),
         "investor_totals_by_year": get_investor_totals_by_years(years, investors),
+        "investor_monthly_totals_by_year": get_investor_monthly_totals_by_years(years, investors),
         "investor_monthly_breakdown": get_investor_monthly_breakdown(years, investors),
         "generated_at": format_datetime(now_datetime()),
         "reference_date": today(),

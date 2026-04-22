@@ -5,6 +5,8 @@ import frappe
 from dashboards.dashboards.dashboard_data import (
     get_customer_balances,
     get_latest_dashboard_update,
+    get_monthly_sales_kg,
+    get_monthly_sales_amount,
     get_reference_month_label,
 )
 
@@ -51,6 +53,8 @@ def get_dashboard_context():
 
     return {
         "tabs": TAB_ITEMS,
+        "timeline_years": get_monthly_sales_kg(year_limit=4),
+        "mini_timeline_years": get_monthly_sales_amount(year_limit=3),
         "summary_rows": summary_rows,
         "side_metrics": SIDE_METRICS,
         "balance_label": "Сальдо на конец",

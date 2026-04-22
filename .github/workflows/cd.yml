@@ -1,0 +1,103 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment to deploy"
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      ref:
+        description: "Branch, tag or SHA to deploy"
+        required: true
+        default: develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  APP_NAME: dashboards
+  DEPLOY_REF: ${{ inputs.ref }}
+  DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.ref }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Validate deployment secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          BENCH_PATH: ${{ secrets.BENCH_PATH }}
+          SITE_NAME: ${{ secrets.SITE_NAME }}
+        run: |
+          test -n "${SSH_HOST}"
+          test -n "${SSH_USER}"
+          test -n "${SSH_PRIVATE_KEY}"
+          test -n "${BENCH_PATH}"
+          test -n "${SITE_NAME}"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${SSH_PORT}" "${SSH_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Deploy with Bench
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          BENCH_PATH: ${{ secrets.BENCH_PATH }}
+          SITE_NAME: ${{ secrets.SITE_NAME }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
+            "APP_NAME='${APP_NAME}' DEPLOY_REF='${DEPLOY_REF}' BENCH_PATH='${BENCH_PATH}' SITE_NAME='${SITE_NAME}' APP_PATH='${APP_PATH}' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "${BENCH_PATH}"
+
+          if [ -z "${APP_PATH}" ]; then
+            APP_PATH="${BENCH_PATH}/apps/${APP_NAME}"
+          fi
+
+          cd "${APP_PATH}"
+          git fetch --prune origin
+          if git show-ref --verify --quiet "refs/remotes/origin/${DEPLOY_REF}"; then
+            git checkout -B "${DEPLOY_REF}" "origin/${DEPLOY_REF}"
+          else
+            git checkout --detach "${DEPLOY_REF}"
+          fi
+
+          cd "${BENCH_PATH}"
+          bench setup requirements
+          bench --site "${SITE_NAME}" migrate
+          bench build --app "${APP_NAME}"
+          bench --site "${SITE_NAME}" clear-cache
+          bench --site "${SITE_NAME}" clear-website-cache
+          bench restart
+          REMOTE

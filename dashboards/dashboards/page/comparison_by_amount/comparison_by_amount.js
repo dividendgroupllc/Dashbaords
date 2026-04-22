@@ -105,6 +105,7 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 							this.context.customer_title || "Клиент сумма"
 						)}</th>
 						${years.map((year) => `<th>${frappe.utils.escape_html(String(year))}</th>`).join("")}
+						<th>${frappe.utils.escape_html(this.context.total_title || "Total")}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -116,6 +117,7 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 										row.label || ""
 									)}</td>
 									${(row.values || []).map((value) => `<td class="is-number">${frappe.utils.escape_html(String(value || ""))}</td>`).join("")}
+									<td class="is-number comparison-by-amount-total-cell">${frappe.utils.escape_html(String(row.total || ""))}</td>
 								</tr>
 							`
 						)
@@ -141,6 +143,7 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 								`
 							)
 							.join("")}
+						<th colspan="2">${frappe.utils.escape_html(this.context.total_title || "Total")}</th>
 					</tr>
 					<tr>
 						<th class="comparison-by-amount-name comparison-by-amount-name--item">${frappe.utils.escape_html(
@@ -149,11 +152,13 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 						${years
 							.map(
 								() => `
-									<th>${frappe.utils.escape_html("Сумма")}</th>
+									<th>${frappe.utils.escape_html(this.context.amount_title || "Сумма")}</th>
 									<th>${frappe.utils.escape_html(this.context.avg_title || "Сре.чек")}</th>
 								`
 							)
 							.join("")}
+						<th>${frappe.utils.escape_html(this.context.total_amount_title || "Сумма")}</th>
+						<th>${frappe.utils.escape_html(this.context.total_avg_title || "Сре.чек")}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -165,6 +170,8 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 										row.label || ""
 									)}</td>
 									${(row.values || []).map((value) => `<td class="is-number">${frappe.utils.escape_html(String(value || ""))}</td>`).join("")}
+									<td class="is-number comparison-by-amount-total-cell">${frappe.utils.escape_html(String(row.total_amount || ""))}</td>
+									<td class="is-number comparison-by-amount-total-cell">${frappe.utils.escape_html(String(row.total_avg || ""))}</td>
 								</tr>
 							`
 						)
@@ -174,4 +181,3 @@ dashboards.ui.ComparisonByAmountPage = class ComparisonByAmountPage {
 		`);
 	}
 };
-

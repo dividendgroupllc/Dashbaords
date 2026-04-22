@@ -60,12 +60,13 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 						<div class="kpi-dashboard-kpis" data-region="kpis"></div>
 						<div class="kpi-dashboard-caption" data-region="caption"></div>
 						<div class="kpi-dashboard-card">
-							<div class="kpi-dashboard-table-wrap" data-region="client-table"></div>
+							<div class="kpi-dashboard-subtitle" data-region="client-table-title"></div>
+							<div class="kpi-dashboard-table-wrap kpi-dashboard-table-wrap--monthly" data-region="client-table"></div>
 						</div>
 						<div class="kpi-dashboard-bottom">
 							<div class="kpi-dashboard-card">
-								<div class="kpi-dashboard-subtitle">Клиент</div>
-								<div class="kpi-dashboard-table-wrap" data-region="summary-table"></div>
+								<div class="kpi-dashboard-subtitle" data-region="summary-table-title"></div>
+								<div class="kpi-dashboard-table-wrap kpi-dashboard-table-wrap--yearly" data-region="summary-table"></div>
 							</div>
 							<div class="kpi-dashboard-card">
 								<div class="kpi-dashboard-subtitle">Диаграмма клиента</div>
@@ -86,7 +87,9 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		this.$months = this.page.main.find('[data-region="months"]');
 		this.$kpis = this.page.main.find('[data-region="kpis"]');
 		this.$caption = this.page.main.find('[data-region="caption"]');
+		this.$clientTableTitle = this.page.main.find('[data-region="client-table-title"]');
 		this.$clientTable = this.page.main.find('[data-region="client-table"]');
+		this.$summaryTableTitle = this.page.main.find('[data-region="summary-table-title"]');
 		this.$summaryTable = this.page.main.find('[data-region="summary-table"]');
 		this.$treemap = this.page.main.find('[data-region="treemap"]');
 	}
@@ -182,12 +185,14 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 
 	render_client_table() {
 		const headers = ["Клиент", "Продажа", "Сб.ст", "КГ", "Возврат", "Маржа", "%", "Бонус", "Скидка", "Маржа нет", "PnL"];
+		this.$clientTableTitle.text(`${this.selectedMonth || ""} ${this.selectedYear || ""} oylik ma'lumot`);
 		this.$clientTable.html(this.make_table(headers, this.data.client_rows || [], "wide"));
 	}
 
 	render_summary_table() {
-		const headers = ["Клиент", "Продажа", "%", "Маржа", "Бонус", "Скидка"];
-		this.$summaryTable.html(this.make_table(headers, this.data.summary_rows || [], "compact"));
+		const headers = ["Клиент", "Продажа", "Сб.ст", "КГ", "Возврат", "Маржа", "%", "Бонус", "Скидка", "Маржа нет", "PnL"];
+		this.$summaryTableTitle.text(`${this.selectedYear || ""} yillik ma'lumot`);
+		this.$summaryTable.html(this.make_table(headers, this.data.summary_rows || [], "wide"));
 	}
 
 	make_table(headers, rows, variant) {
@@ -195,6 +200,24 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		const colgroup = widths.length
 			? `<colgroup>${widths.map((width) => `<col style="width:${width}">`).join("")}</colgroup>`
 			: "";
+		const totalRow = rows.find((row) => row[row.length - 1] === true) || null;
+		const bodyRows = rows.filter((row) => row[row.length - 1] !== true);
+
+		const renderRow = (row, extraClass = "") => {
+			const isTotal = row[row.length - 1] === true;
+			const values = isTotal ? row.slice(0, -1) : row;
+			return `
+				<tr class="${extraClass}">
+					${values
+						.map((value, index) => {
+							const alignClass = index === 0 ? "is-text" : "is-number";
+							return `<td class="${alignClass}">${frappe.utils.escape_html(String(value))}</td>`;
+						})
+						.join("")}
+				</tr>
+			`;
+		};
+
 		return `
 			<table class="kpi-dashboard-table kpi-dashboard-table--${variant}">
 				${colgroup}
@@ -202,23 +225,9 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 					<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
 				</thead>
 				<tbody>
-					${rows
-						.map((row) => {
-							const isTotal = row[row.length - 1] === true;
-							const values = isTotal ? row.slice(0, -1) : row;
-							return `
-								<tr class="${isTotal ? "is-total" : ""}">
-									${values
-										.map((value, index) => {
-											const alignClass = index === 0 ? "is-text" : "is-number";
-											return `<td class="${alignClass}">${frappe.utils.escape_html(String(value))}</td>`;
-										})
-										.join("")}
-								</tr>
-							`;
-						})
-						.join("")}
+					${bodyRows.map((row) => renderRow(row)).join("")}
 				</tbody>
+				${totalRow ? `<tfoot>${renderRow(totalRow, "is-total")}</tfoot>` : ""}
 			</table>
 		`;
 	}
@@ -235,20 +244,167 @@ dashboards.ui.KPIDashboardPage = class KPIDashboardPage {
 		return new Array(length).fill(`${Math.floor(100 / Math.max(length, 1))}%`);
 	}
 
+	compute_treemap_layout(items) {
+		const width = Math.max(this.$treemap.innerWidth() || 0, 1);
+		const height = Math.max(this.$treemap.innerHeight() || 0, 1);
+		const totalArea = width * height;
+		const total = items.reduce((sum, item) => sum + Number(item.net_profit_margin_amount || 0), 0) || 1;
+		const normalized = items
+			.filter((item) => Number(item.net_profit_margin_amount || 0) > 0)
+			.map((item) => ({
+				...item,
+				net_profit_margin_amount: Number(item.net_profit_margin_amount || 0),
+				area: Number(item.net_profit_margin_amount || 0) / total,
+				size: (Number(item.net_profit_margin_amount || 0) / total) * totalArea,
+			}))
+			.filter((item) => item.size > 0);
+
+		if (!normalized.length) {
+			return [];
+		}
+
+		const shortest = (rect) => Math.min(rect.width, rect.height);
+		const worst = (row, side) => {
+			if (!row.length || !side) {
+				return Number.POSITIVE_INFINITY;
+			}
+
+			const areas = row.map((item) => item.size);
+			const sum = areas.reduce((acc, area) => acc + area, 0);
+			const max = Math.max(...areas);
+			const min = Math.min(...areas);
+
+			if (!min || !sum) {
+				return Number.POSITIVE_INFINITY;
+			}
+
+			const sideSquared = side * side;
+			const sumSquared = sum * sum;
+			return Math.max((sideSquared * max) / sumSquared, sumSquared / (sideSquared * min));
+		};
+
+		const layoutRow = (row, rect) => {
+			const rowArea = row.reduce((sum, item) => sum + item.size, 0);
+			const output = [];
+
+			// Pack each row along the shorter side. On wide containers this creates columns,
+			// which avoids the "stacked horizontal strips" failure mode.
+			if (rect.width >= rect.height) {
+				const rowWidth = rect.height ? rowArea / rect.height : 0;
+				let offsetY = rect.y;
+				row.forEach((item) => {
+					const itemHeight = rowWidth ? item.size / rowWidth : 0;
+					output.push({
+						...item,
+						x: rect.x,
+						y: offsetY,
+						width: rowWidth,
+						height: itemHeight,
+					});
+					offsetY += itemHeight;
+				});
+				return {
+					rect: {
+						x: rect.x + rowWidth,
+						y: rect.y,
+						width: Math.max(rect.width - rowWidth, 0),
+						height: rect.height,
+					},
+					tiles: output,
+				};
+			}
+
+			const rowHeight = rect.width ? rowArea / rect.width : 0;
+			let offsetX = rect.x;
+			row.forEach((item) => {
+				const itemWidth = rowHeight ? item.size / rowHeight : 0;
+				output.push({
+					...item,
+					x: offsetX,
+					y: rect.y,
+					width: itemWidth,
+					height: rowHeight,
+				});
+				offsetX += itemWidth;
+			});
+
+			return {
+				rect: {
+					x: rect.x,
+					y: rect.y + rowHeight,
+					width: rect.width,
+					height: Math.max(rect.height - rowHeight, 0),
+				},
+				tiles: output,
+			};
+		};
+
+		let rect = { x: 0, y: 0, width, height };
+		let row = [];
+		let remaining = [...normalized];
+		const tiles = [];
+
+		while (remaining.length) {
+			const next = remaining[0];
+			const side = shortest(rect);
+			const nextRow = [...row, next];
+
+			if (!row.length || worst(nextRow, side) <= worst(row, side)) {
+				row = nextRow;
+				remaining.shift();
+				continue;
+			}
+
+			const result = layoutRow(row, rect);
+			tiles.push(...result.tiles);
+			rect = result.rect;
+			row = [];
+		}
+
+		if (row.length) {
+			const result = layoutRow(row, rect);
+			tiles.push(...result.tiles);
+		}
+
+		return tiles.map((item) => ({
+			...item,
+			x: item.x / width,
+			y: item.y / height,
+			width: item.width / width,
+			height: item.height / height,
+		}));
+	}
+
 	render_treemap() {
 		const items = this.data.treemap || [];
-		const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0) || 1;
 		const palette = ["#2f87e4", "#2836a7", "#f07432", "#7a0f93", "#d63ba6", "#7251c7", "#f0c000", "#20a36e"];
 		const formatNumber = (value) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Number(value || 0));
+		const total = items.reduce((sum, item) => sum + Number(item.net_profit_margin_amount || 0), 0) || 1;
+		const tiles = this.compute_treemap_layout(items);
 
 		this.$treemap.html(
-			items
+			tiles
 				.map((item, index) => {
-					const ratio = Math.max(10, Math.round((Number(item.value || 0) / total) * 100));
+					const areaPercent = item.area * 100;
+					const compactClass = areaPercent < 8 ? "is-compact" : "";
+					const tinyClass = areaPercent < 4 ? "is-tiny" : "";
+					const displayLabel = item.client_name || "";
+					const fontSize = Math.max(10, Math.min(24, Math.round(Math.sqrt(areaPercent) * 2.2)));
 					return `
-						<div class="kpi-dashboard-treemap-item" style="flex:${ratio}; background:${palette[index % palette.length]}">
-							<div class="kpi-dashboard-treemap-name">${frappe.utils.escape_html(item.label)}</div>
-							<div class="kpi-dashboard-treemap-value">${frappe.utils.escape_html(formatNumber(item.value))}</div>
+						<div
+							class="kpi-dashboard-treemap-item ${compactClass} ${tinyClass}"
+							style="
+								left:${(item.x * 100).toFixed(4)}%;
+								top:${(item.y * 100).toFixed(4)}%;
+								width:${(item.width * 100).toFixed(4)}%;
+								height:${(item.height * 100).toFixed(4)}%;
+								background:${palette[index % palette.length]};
+							"
+							title="${frappe.utils.escape_html(displayLabel)}: ${frappe.utils.escape_html(
+								formatNumber(item.net_profit_margin_amount)
+							)}"
+						>
+							<div class="kpi-dashboard-treemap-name" style="font-size:${fontSize}px">${frappe.utils.escape_html(displayLabel)}</div>
 						</div>
 					`;
 				})

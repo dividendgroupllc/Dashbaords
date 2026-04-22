@@ -12,8 +12,11 @@ dashboards.ui.ComparisonByProductPage = class ComparisonByProductPage {
 			title: __("Comparison by Product"),
 			single_column: true,
 		});
+		this.handleResize = () => this.syncLayoutHeight();
 
 		this.make_layout();
+		$(window).off("resize.comparison-by-product", this.handleResize);
+		$(window).on("resize.comparison-by-product", this.handleResize);
 		this.load_context();
 	}
 
@@ -40,6 +43,8 @@ dashboards.ui.ComparisonByProductPage = class ComparisonByProductPage {
 			route: "comparison-by-product",
 		});
 
+		this.$screen = this.page.main.find(".comparison-by-product-screen");
+		this.$shell = this.page.main.find(".comparison-by-product-shell");
 		this.$productTable = this.page.main.find('[data-region="product-table"]');
 		this.$customerStack = this.page.main.find('[data-region="customer-stack"]');
 	}
@@ -57,6 +62,7 @@ dashboards.ui.ComparisonByProductPage = class ComparisonByProductPage {
 	render() {
 		this.renderProductTable();
 		this.renderCustomerTables();
+		this.syncLayoutHeight();
 	}
 
 	renderProductTable() {
@@ -135,5 +141,53 @@ dashboards.ui.ComparisonByProductPage = class ComparisonByProductPage {
 				)
 				.join("")
 		);
+	}
+
+	syncLayoutHeight() {
+		window.requestAnimationFrame(() => {
+			const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+			const bottomGap = 16;
+			const productElement = this.$productTable.get(0);
+
+			if (!viewportHeight || !productElement) {
+				return;
+			}
+
+			const productRect = productElement.getBoundingClientRect();
+			const productHeight = Math.max(Math.floor(viewportHeight - productRect.top - bottomGap), 320);
+			this.$productTable.css({
+				height: `${productHeight}px`,
+				"max-height": `${productHeight}px`,
+			});
+
+			if (window.innerWidth <= 1280) {
+				this.$customerStack.css({
+					"max-height": "",
+					overflow: "",
+				});
+				this.$customerStack.find(".comparison-by-product-table-wrap").css({
+					height: "",
+					"max-height": "",
+				});
+				return;
+			}
+
+			const stackRect = this.$customerStack.get(0)?.getBoundingClientRect();
+			const stackHeight = stackRect ? Math.max(Math.floor(viewportHeight - stackRect.top - bottomGap), 320) : productHeight;
+			this.$customerStack.css({
+				"max-height": `${stackHeight}px`,
+				overflow: "auto",
+			});
+
+			const $customerWraps = this.$customerStack.find(".comparison-by-product-table-wrap");
+			const wrapCount = $customerWraps.length || 1;
+			const gapTotal = Math.max(wrapCount - 1, 0) * 10;
+			const wrapHeight = Math.max(Math.floor((stackHeight - gapTotal) / wrapCount), 150);
+
+			$customerWraps.css({
+				height: `${wrapHeight}px`,
+				"max-height": `${wrapHeight}px`,
+			});
+		});
 	}
 };

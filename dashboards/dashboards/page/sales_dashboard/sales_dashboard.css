@@ -32,6 +32,41 @@
 	margin: 0 10px 10px;
 }
 
+.sales-dashboard-year-group-wrap {
+	max-width: 100%;
+}
+
+.sales-dashboard-year-group-wrap.is-centered {
+	overflow: visible;
+}
+
+.sales-dashboard-year-group-wrap.is-scrollable {
+	width: fit-content;
+	max-width: calc((72px * 6) + (10px * 5) + 20px);
+	max-height: 38px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scrollbar-width: thin;
+}
+
+.sales-dashboard-year-group {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.sales-dashboard-year-group-wrap.is-centered .sales-dashboard-year-group {
+	justify-content: flex-start;
+	flex-wrap: wrap;
+}
+
+.sales-dashboard-year-group-wrap.is-scrollable .sales-dashboard-year-group {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(72px, auto));
+	justify-content: flex-start;
+	align-items: start;
+}
+
 .sales-dashboard-filters--months {
 	display: grid;
 	grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -92,7 +127,7 @@
 }
 
 .sales-dashboard-table-wrap {
-	max-height: calc(100vh - 190px);
+	max-height: calc(100vh - 220px);
 	overflow: auto;
 }
 
@@ -167,5 +202,17 @@
 	.sales-dashboard-table-panel {
 		width: 100%;
 		transform: none;
+	}
+}
+
+@media (max-width: 768px) {
+	.sales-dashboard-year-group-wrap {
+		width: auto;
+		max-width: 100%;
+	}
+
+	.sales-dashboard-year-group-wrap.is-centered .sales-dashboard-year-group,
+	.sales-dashboard-year-group-wrap.is-scrollable .sales-dashboard-year-group {
+		justify-content: flex-start;
 	}
 }

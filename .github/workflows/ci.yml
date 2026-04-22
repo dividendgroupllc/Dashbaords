@@ -1,106 +1,171 @@
-
 name: CI
 
 on:
+  pull_request:
   push:
     branches:
       - develop
-  pull_request:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: develop-dashboards-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  APP_NAME: dashboards
+  FRAPPE_BRANCH: version-15
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "18"
+
 jobs:
-  tests:
+  lint:
+    name: Lint and format
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: Server
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pre-commit
+        run: python -m pip install --upgrade pip pre-commit
+
+      - name: Run pre-commit hooks
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Run pip-audit
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit --desc on .
+
+      - name: Checkout Frappe Semgrep rules
+        uses: actions/checkout@v4
+        with:
+          repository: frappe/semgrep-rules
+          path: frappe-semgrep-rules
+
+      - name: Run Semgrep
+        run: |
+          python -m pip install semgrep
+          semgrep scan --error --config ./frappe-semgrep-rules/rules --config r/python.lang.correctness
+
+  frappe:
+    name: Frappe install, migrate and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
-      redis-cache:
-        image: redis:alpine
-        ports:
-          - 13000:6379
-      redis-queue:
-        image: redis:alpine
-        ports:
-          - 11000:6379
       mariadb:
         image: mariadb:10.6
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=2s
+          --health-retries=20
+
+      redis-cache:
+        image: redis:7-alpine
+        ports:
+          - 13000:6379
+
+      redis-queue:
+        image: redis:7-alpine
+        ports:
+          - 11000:6379
 
     steps:
-      - name: Clone
-        uses: actions/checkout@v3
-
-      - name: Find tests
-        run: |
-          echo "Finding tests"
-          grep -rn "def test" > /dev/null
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
-          check-latest: true
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py', '**/setup.cfg') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
-
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install MariaDB Client
-        run: sudo apt-get install mariadb-client-10.6
-
-      - name: Setup
+      - name: Install system packages
         run: |
-          pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
-          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
-          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+          sudo apt-get update
+          sudo apt-get install --yes mariadb-client redis-tools
 
-      - name: Install
+      - name: Install Bench
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install frappe-bench
+
+      - name: Initialize bench
+        run: |
+          bench init \
+            --frappe-branch "${FRAPPE_BRANCH}" \
+            --skip-redis-config-generation \
+            --skip-assets \
+            --python "$(which python)" \
+            ~/frappe-bench
+
+      - name: Configure database
+        run: |
+          mariadb --host 127.0.0.1 --port 3306 -uroot -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
+          mariadb --host 127.0.0.1 --port 3306 -uroot -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+
+      - name: Install app on test site
         working-directory: /home/runner/frappe-bench
-        run: |
-          bench get-app dashboards $GITHUB_WORKSPACE
-          bench setup requirements --dev
-          bench new-site --db-root-password root --admin-password admin test_site
-          bench --site test_site install-app dashboards
-          bench build
         env:
-          CI: 'Yes'
-
-      - name: Run Tests
-        working-directory: /home/runner/frappe-bench
+          CI: "Yes"
         run: |
-          bench --site test_site set-config allow_tests true
-          bench --site test_site run-tests --app dashboards
+          bench get-app "${APP_NAME}" "${GITHUB_WORKSPACE}"
+          bench setup requirements --dev
+          bench new-site test_site --db-root-password root --admin-password admin --no-mariadb-socket
+          bench --site test_site install-app "${APP_NAME}"
+          bench --site test_site migrate
+          bench build --app "${APP_NAME}"
+
+      - name: Run app tests when present
+        working-directory: /home/runner/frappe-bench
         env:
           TYPE: server
+        run: |
+          if find "apps/${APP_NAME}/${APP_NAME}" -type f \( -name 'test_*.py' -o -name '*_test.py' \) | grep -q .; then
+            bench --site test_site set-config allow_tests true
+            bench --site test_site run-tests --app "${APP_NAME}"
+          else
+            echo "No Python tests found for ${APP_NAME}; install, migrate and build smoke checks passed."
+          fi

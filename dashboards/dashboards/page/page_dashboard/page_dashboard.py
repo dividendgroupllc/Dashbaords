@@ -3,14 +3,19 @@ from __future__ import annotations
 import frappe
 
 from dashboards.dashboards.page.page_dashboard.data import (
+    get_avg_check_chart_data,
+    get_avg_cost_chart_data,
     get_client_kpi_by_year,
     get_dashboard_years,
+    get_dashboard_summary,
     get_default_year,
+    get_kg_chart_data,
     get_product_margin_by_year,
     get_regional_summary_by_year,
     get_returns_by_month,
     get_sales_by_month,
 )
+from dashboards.dashboards.dashboard_data import format_number
 
 
 TAB_ITEMS = [
@@ -49,6 +54,22 @@ def _rows(data):
     return rows
 
 
+def _kpi_totals_by_year(years: list[str]) -> dict[str, dict[str, str]]:
+    result: dict[str, dict[str, str]] = {}
+    for year in years:
+        summary = get_dashboard_summary(year)
+        result[year] = {
+            "sales_total": format_number(summary.get("sales_total"), precision=0),
+            "cost_total": format_number(summary.get("cost_total"), precision=0),
+            "margin_total": format_number(summary.get("margin_total"), precision=0),
+            "rsp_total": format_number(summary.get("rsp_total"), precision=0),
+            "return_total": format_number(summary.get("return_total"), precision=0),
+            "kg_total": format_number(summary.get("kg_total"), precision=0),
+            "avg_check": format_number(summary.get("avg_check"), precision=0),
+        }
+    return result
+
+
 @frappe.whitelist()
 def get_dashboard_context():
     years = get_dashboard_years()
@@ -59,6 +80,15 @@ def get_dashboard_context():
         "kpis": KPI_ITEMS,
         "years": years,
         "default_year": default_year,
+        "kpi_totals_by_year": _kpi_totals_by_year(years),
+        "chart_data_by_year": {
+            year: {
+                "price_trend": get_avg_cost_chart_data(year),
+                "check_trend": get_avg_check_chart_data(year),
+                "kg_trend": get_kg_chart_data(year),
+            }
+            for year in years
+        },
         "sales_by_month_by_year": {year: _rows(get_sales_by_month(year)) for year in years},
         "returns_by_month_by_year": {year: _rows(get_returns_by_month(year)) for year in years},
         "product_margin_by_year": {year: _rows(rows) for year, rows in get_product_margin_by_year().items()},

@@ -160,25 +160,45 @@ def _get_item_rows(selected_month: str, years: list[str]) -> list[dict[str, Any]
 	result = []
 	for label in ordered_labels:
 		row_values = []
+		total_qty = 0.0
+		total_amount = 0.0
 		for year in years:
 			qty = grouped[label][year]["qty"]
 			amount = grouped[label][year]["amount"]
 			avg_price = amount / qty if qty else 0
+			total_qty += qty
+			total_amount += amount
 			row_values.extend([_format_int(qty) if qty else "", _format_int(avg_price) if avg_price else ""])
 
-		result.append({"label": label, "values": row_values})
+		total_avg_price = total_amount / total_qty if total_qty else 0
+		result.append(
+			{
+				"label": label,
+				"values": row_values,
+				"total_qty": _format_int(total_qty) if total_qty else "",
+				"total_avg": _format_int(total_avg_price) if total_avg_price else "",
+			}
+		)
 
 	total_values = []
+	grand_total_qty = 0.0
+	grand_total_amount = 0.0
 	for year in years:
 		qty = totals_by_year[year]["qty"]
 		amount = totals_by_year[year]["amount"]
 		avg_price = amount / qty if qty else 0
+		grand_total_qty += qty
+		grand_total_amount += amount
 		total_values.extend([_format_int(qty) if qty else "", _format_int(avg_price) if avg_price else ""])
+
+	grand_total_avg_price = grand_total_amount / grand_total_qty if grand_total_qty else 0
 
 	result.append(
 		{
 			"label": "Total",
 			"values": total_values,
+			"total_qty": _format_int(grand_total_qty) if grand_total_qty else "",
+			"total_avg": _format_int(grand_total_avg_price) if grand_total_avg_price else "",
 			"is_total": True,
 		}
 	)
@@ -200,5 +220,7 @@ def get_dashboard_context(month: str | None = None) -> dict[str, Any]:
 		"item_title": "Предмет кг",
 		"qty_title": "КГ",
 		"avg_title": "Сред цена",
+		"total_qty_title": "KG",
+		"total_avg_title": "Сред цена",
 		"total_title": "Total",
 	}

@@ -48,6 +48,16 @@ def _empty_month_map() -> dict[int, float]:
     return {month_no: 0 for month_no in range(1, 13)}
 
 
+def _resolve_year(filters=None) -> str:
+    if filters:
+        parsed_filters = frappe.parse_json(filters) if not isinstance(filters, dict) else filters
+        year = parsed_filters.get("year") if parsed_filters else None
+        if year:
+            return str(year)
+
+    return get_default_year()
+
+
 def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
     invoice_clause, invoice_params = _year_filter_clause(year)
     item_clause, item_params = _year_filter_clause(year, alias="si")
@@ -156,7 +166,7 @@ def get_returns_by_month(year: str | None = None) -> list[list[str]]:
     return [[MONTH_LABELS[month_no - 1], format_number(month_map[month_no])] for month_no in range(1, 13)]
 
 
-def get_product_margin_by_year(limit: int = 10) -> dict[str, list[list[str | bool]]]:
+def get_product_margin_by_year(limit: int | None = None) -> dict[str, list[list[str | bool]]]:
     result = {year: [] for year in get_dashboard_years()}
 
     rows = frappe.db.sql(
@@ -208,7 +218,7 @@ def get_product_margin_by_year(limit: int = 10) -> dict[str, list[list[str | boo
     return result
 
 
-def get_client_kpi_by_year(limit: int = 12) -> dict[str, list[list[str | bool]]]:
+def get_client_kpi_by_year(limit: int | None = None) -> dict[str, list[list[str | bool]]]:
     result = {year: [] for year in get_dashboard_years()}
 
     rows = frappe.db.sql(
@@ -246,6 +256,11 @@ def get_client_kpi_by_year(limit: int = 12) -> dict[str, list[list[str | bool]]]
 
     for year, values in grouped.items():
         sorted_values = sorted(values, key=lambda row: row["sales"], reverse=True)
+        selected_values = sorted_values[:limit] if limit is not None else sorted_values
+        total_qty = sum(row["qty"] for row in values)
+        total_sales = sum(row["sales"] for row in values)
+        total_margin = sum(row["margin"] for row in values)
+        total_profitability = (total_margin / total_sales * 100) if total_sales else 0
         result[year] = [
             [
                 row["client"],
@@ -253,8 +268,17 @@ def get_client_kpi_by_year(limit: int = 12) -> dict[str, list[list[str | bool]]]
                 format_number(row["sales"]),
                 f"{row['profitability']:.1f}%".replace(".", ","),
             ]
-            for row in sorted_values[:limit]
+            for row in selected_values
         ]
+        result[year].append(
+            [
+                "Total",
+                format_number(total_qty),
+                format_number(total_sales),
+                f"{total_profitability:.1f}%".replace(".", ","),
+                True,
+            ]
+        )
 
     return result
 
@@ -407,34 +431,34 @@ def get_kg_chart_data(year: str | None = None) -> dict[str, Any]:
 
 @frappe.whitelist()
 def get_sales_total(filters=None):
-    return _format_summary_value("sales_total", get_default_year())
+    return _format_summary_value("sales_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_cost_total(filters=None):
-    return _format_summary_value("cost_total", get_default_year())
+    return _format_summary_value("cost_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_margin_total(filters=None):
-    return _format_summary_value("margin_total", get_default_year())
+    return _format_summary_value("margin_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_rsp_total(filters=None):
-    return _format_summary_value("rsp_total", get_default_year())
+    return _format_summary_value("rsp_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_return_total(filters=None):
-    return _format_summary_value("return_total", get_default_year())
+    return _format_summary_value("return_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_kg_total(filters=None):
-    return _format_summary_value("kg_total", get_default_year())
+    return _format_summary_value("kg_total", _resolve_year(filters))
 
 
 @frappe.whitelist()
 def get_avg_check(filters=None):
-    return _format_summary_value("avg_check", get_default_year())
+    return _format_summary_value("avg_check", _resolve_year(filters))
