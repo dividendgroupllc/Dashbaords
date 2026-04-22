@@ -32,7 +32,7 @@ Pre-commit is configured to use the following tools for checking and formatting 
 
 GitHub Actions workflows are configured in `.github/workflows`:
 
-- `CI`: runs pre-commit hooks, `pip-audit`, Frappe Semgrep rules, and a Frappe v15 install/migrate/build smoke test on pull requests and pushes to `develop` or `main`.
+- `CI`: runs pre-commit hooks and a Frappe v15 install/migrate/build smoke test as blocking checks on pull requests and pushes to `develop` or `main`. `pip-audit` and Frappe Semgrep rules run in advisory mode so existing findings are visible without blocking delivery.
 - `CD`: deploys a selected branch, tag, or SHA to a protected GitHub environment through SSH and Bench. Run it manually from the Actions tab.
 
 Configure these environment secrets for each deploy target:

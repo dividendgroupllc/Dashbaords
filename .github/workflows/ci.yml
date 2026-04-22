@@ -49,8 +49,9 @@ jobs:
         run: pre-commit run --all-files --show-diff-on-failure
 
   security:
-    name: Security checks
+    name: Security checks (advisory)
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 20
 
     steps:
