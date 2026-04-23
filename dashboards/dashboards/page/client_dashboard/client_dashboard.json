@@ -1,16 +1,23 @@
 {
  "content": null,
- "creation": "2026-04-11 00:00:00.000000",
+ "creation": "2026-04-11 00:00:00",
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-11 00:00:00.000000",
+ "modified": "2026-04-23 22:33:22.467678",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "client-dashboard",
  "owner": "Administrator",
  "page_name": "client-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "investor"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

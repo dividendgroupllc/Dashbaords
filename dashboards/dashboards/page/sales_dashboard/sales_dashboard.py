@@ -5,7 +5,7 @@ from typing import Any
 import frappe
 from frappe.utils import flt, getdate, today
 
-from dashboards.dashboards.dashboard_data import MONTH_LABELS
+from dashboards.dashboards.dashboard_data import MONTH_LABELS, get_item_cogs_map, get_item_rcp_map
 
 
 MONTHS = [{"key": label.lower(), "label": label} for label in MONTH_LABELS]
@@ -56,21 +56,26 @@ def _normalize_filters(year: str | None, month: str | None) -> tuple[str, str]:
 
 
 def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
+	cogs_map = get_item_cogs_map(year, MONTH_MAP[month])
+	rcp_map = get_item_rcp_map(year, MONTH_MAP[month])
 	rows = frappe.db.sql(
 		"""
 		SELECT
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item') AS item_key,
 			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item') AS item,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
 			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost,
-			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS rsp
+			0 AS rsp
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
 		  AND COALESCE(si.is_return, 0) = 0
 		  AND YEAR(si.posting_date) = %(year)s
 		  AND MONTH(si.posting_date) = %(month)s
-		GROUP BY COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item')
+		GROUP BY
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item'),
+			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Unknown Item')
 		ORDER BY sales DESC, item ASC
 		""",
 		{"year": int(year), "month": int(MONTH_MAP[month])},
@@ -80,9 +85,9 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 	result = []
 	for row in rows:
 		sales = flt(row.sales)
-		cost = flt(row.cost)
+		cost = flt(row.cost) or flt(cogs_map.get(row.item_key))
 		margin = sales - cost
-		rsp = flt(row.rsp)
+		rsp = flt(rcp_map.get(row.item_key))
 		profit = margin - rsp
 		result.append(
 			{

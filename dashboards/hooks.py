@@ -213,7 +213,10 @@ fixtures = [
 
 # Re-apply dashboard widget metadata on every migrate so missing/edited
 # chart and number card records are repaired automatically.
-after_migrate = ["dashboards.patches.v1_0.setup_main_dashboard.execute"]
+after_migrate = [
+	"dashboards.patches.v1_0.setup_main_dashboard.execute",
+	"dashboards.patches.v1_0.ensure_dashboard_access.execute",
+]
 
 # Job Events
 # ----------

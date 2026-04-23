@@ -10,7 +10,14 @@
  "name": "page-dashboard",
  "owner": "Administrator",
  "page_name": "page-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "investor"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

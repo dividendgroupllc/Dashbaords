@@ -6,7 +6,7 @@ from typing import Any
 import frappe
 from frappe.utils import flt, getdate, today
 
-from dashboards.dashboards.dashboard_data import MONTH_LABELS, format_number
+from dashboards.dashboards.dashboard_data import MONTH_LABELS, format_number, get_cogs_total, get_rcp_totals
 
 
 def get_dashboard_years() -> list[str]:
@@ -61,13 +61,13 @@ def _resolve_year(filters=None) -> str:
 def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
     invoice_clause, invoice_params = _year_filter_clause(year)
     item_clause, item_params = _year_filter_clause(year, alias="si")
+    rcp_totals = get_rcp_totals(year)
 
     invoice_totals = frappe.db.sql(
         f"""
         SELECT
             SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN COALESCE(base_net_total, net_total, 0) ELSE 0 END) AS sales_total,
             SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(base_net_total, net_total, 0)) ELSE 0 END) AS return_total,
-            SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN ABS(COALESCE(base_total_taxes_and_charges, total_taxes_and_charges, 0)) ELSE 0 END) AS rsp_total,
             COUNT(CASE WHEN COALESCE(is_return, 0) = 0 THEN name END) AS invoice_count
         FROM `tabSales Invoice`
         WHERE docstatus = 1
@@ -93,7 +93,7 @@ def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
     )[0]
 
     sales_total = flt(invoice_totals.sales_total)
-    cost_total = flt(item_totals.cost_total)
+    cost_total = flt(item_totals.cost_total) or flt(get_cogs_total(year))
     margin_total = sales_total - cost_total
     invoice_count = flt(invoice_totals.invoice_count)
 
@@ -101,7 +101,7 @@ def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
         "sales_total": sales_total,
         "cost_total": cost_total,
         "margin_total": margin_total,
-        "rsp_total": flt(invoice_totals.rsp_total),
+        "rsp_total": flt(rcp_totals["rcp_total"]),
         "return_total": flt(invoice_totals.return_total),
         "kg_total": flt(item_totals.kg_total),
         "avg_check": sales_total / invoice_count if invoice_count else 0,

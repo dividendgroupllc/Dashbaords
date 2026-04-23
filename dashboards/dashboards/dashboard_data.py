@@ -22,6 +22,268 @@ MONTH_LABELS = [
 ]
 
 
+def _month_number(month: str | int | None) -> int | None:
+    if month in (None, ""):
+        return None
+
+    if isinstance(month, int):
+        return month
+
+    month_key = str(month).strip().lower()
+    if month_key.isdigit():
+        return cint(month_key)
+
+    try:
+        return MONTH_LABELS.index(month_key.title()) + 1
+    except ValueError:
+        return None
+
+
+def _get_expense_total_by_root(
+    year: str | int | None,
+    month: str | int | None,
+    root_account_patterns: list[str],
+    company: str | None = None,
+    exclude_account_patterns: list[str] | None = None,
+) -> float:
+    if not year or not root_account_patterns:
+        return 0
+
+    month_no = _month_number(month)
+    pattern_conditions = " OR ".join(
+        " OR ".join(
+            [
+                f"root_acc.name = {frappe.db.escape(pattern)}",
+                f"root_acc.name LIKE {frappe.db.escape(pattern + ' - %')}",
+                f"root_acc.name LIKE {frappe.db.escape('% - ' + pattern + ' - %')}",
+                f"root_acc.name LIKE {frappe.db.escape('% - ' + pattern)}",
+            ]
+        )
+        for pattern in root_account_patterns
+    )
+    exclude_patterns = exclude_account_patterns or []
+    exclude_conditions = " OR ".join(
+        " OR ".join(
+            [
+                f"exclude_acc.name = {frappe.db.escape(pattern)}",
+                f"exclude_acc.name LIKE {frappe.db.escape(pattern + ' - %')}",
+                f"exclude_acc.name LIKE {frappe.db.escape('% - ' + pattern + ' - %')}",
+                f"exclude_acc.name LIKE {frappe.db.escape('% - ' + pattern)}",
+            ]
+        )
+        for pattern in exclude_patterns
+    )
+    exclude_clause = (
+        f"""
+          AND NOT EXISTS (
+              SELECT 1
+              FROM `tabAccount` exclude_acc
+              WHERE ({exclude_conditions})
+                AND acc.lft >= exclude_acc.lft
+                AND acc.rgt <= exclude_acc.rgt
+          )
+        """
+        if exclude_conditions
+        else ""
+    )
+    company_filter = f" AND gle.company = {frappe.db.escape(company)}" if company else ""
+    month_filter = f" AND MONTH(gle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    result = frappe.db.sql(
+        f"""
+        SELECT ABS(IFNULL(SUM(gle.debit - gle.credit), 0)) AS total
+        FROM `tabGL Entry` gle
+        INNER JOIN `tabAccount` acc ON acc.name = gle.account
+        WHERE gle.docstatus = 1
+          AND gle.is_cancelled = 0
+          AND YEAR(gle.posting_date) = {frappe.db.escape(year)}
+          {month_filter}
+          {company_filter}
+          AND EXISTS (
+              SELECT 1
+              FROM `tabAccount` root_acc
+              WHERE ({pattern_conditions})
+                AND acc.lft >= root_acc.lft
+                AND acc.rgt <= root_acc.rgt
+          )
+          {exclude_clause}
+        """,
+        as_dict=True,
+    )
+
+    return flt(result[0].total) if result else 0
+
+
+def get_rcp_totals(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+    direct_total = _get_expense_total_by_root(
+        year,
+        month,
+        ["Direct Expenses"],
+        exclude_account_patterns=["Stock Expenses", "Cost of Goods Sold", "Stock Adjustment"],
+    )
+    indirect_total = _get_expense_total_by_root(year, month, ["Indirect Expenses"])
+    return {
+        "direct_total": direct_total,
+        "indirect_total": indirect_total,
+        "rcp_total": direct_total + indirect_total,
+    }
+
+
+def get_stock_ledger_cost_total(year: str | int | None, month: str | int | None = None) -> float:
+    if not year:
+        return 0
+
+    month_no = _month_number(month)
+    month_filter = f" AND MONTH(sle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    result = frappe.db.sql(
+        f"""
+        SELECT SUM(ABS(COALESCE(sle.stock_value_difference, 0))) AS cost_total
+        FROM `tabStock Ledger Entry` sle
+        WHERE sle.is_cancelled = 0
+          AND sle.voucher_type = 'Sales Invoice'
+          AND COALESCE(sle.actual_qty, 0) < 0
+          AND YEAR(sle.posting_date) = {frappe.db.escape(year)}
+          {month_filter}
+        """,
+        as_dict=True,
+    )
+
+    return flt(result[0].cost_total) if result else 0
+
+
+def get_item_stock_ledger_cost_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+    if not year:
+        return {}
+
+    month_no = _month_number(month)
+    month_filter = f" AND MONTH(sle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item') AS item_key,
+            SUM(ABS(COALESCE(sle.stock_value_difference, 0))) AS cost
+        FROM `tabStock Ledger Entry` sle
+        INNER JOIN `tabSales Invoice Item` sii ON sii.name = sle.voucher_detail_no
+        INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+        WHERE sle.is_cancelled = 0
+          AND sle.voucher_type = 'Sales Invoice'
+          AND COALESCE(sle.actual_qty, 0) < 0
+          AND si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
+          AND YEAR(sle.posting_date) = {frappe.db.escape(year)}
+          {month_filter}
+        GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item')
+        """,
+        as_dict=True,
+    )
+
+    return {row.item_key: flt(row.cost) for row in rows}
+
+
+def get_cogs_total(year: str | int | None, month: str | int | None = None) -> float:
+    return get_stock_ledger_cost_total(year, month) or _get_expense_total_by_root(year, month, ["Cost of Goods Sold"])
+
+
+def get_item_cogs_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+    stock_ledger_cost_map = get_item_stock_ledger_cost_map(year, month)
+    if stock_ledger_cost_map:
+        return stock_ledger_cost_map
+
+    if not year:
+        return {}
+
+    month_no = _month_number(month)
+    month_filter_sales = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    sold_rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item') AS item_key,
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
+          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
+          {month_filter_sales}
+        GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item')
+        """,
+        as_dict=True,
+    )
+
+    cogs_total = get_cogs_total(year, month)
+    total_sold_qty = sum(flt(row.qty) for row in sold_rows)
+
+    return {
+        row.item_key: flt(row.qty) / total_sold_qty * cogs_total
+        for row in sold_rows
+        if total_sold_qty
+    }
+
+
+def get_item_rcp_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+    if not year:
+        return {}
+
+    month_no = _month_number(month)
+    month_filter_sales = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    month_filter_stock = f" AND MONTH(se.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    sold_rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item') AS item_key,
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
+          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
+          {month_filter_sales}
+        GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Unknown Item')
+        """,
+        as_dict=True,
+    )
+
+    manufactured_rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Unknown Item') AS item_key,
+            SUM(COALESCE(sed.qty, 0)) AS qty
+        FROM `tabStock Entry` se
+        INNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
+        WHERE se.docstatus = 1
+          AND se.stock_entry_type = 'Manufacture'
+          AND sed.is_finished_item = 1
+          AND YEAR(se.posting_date) = {frappe.db.escape(year)}
+          {month_filter_stock}
+        GROUP BY COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Unknown Item')
+        """,
+        as_dict=True,
+    )
+
+    totals = get_rcp_totals(year, month)
+    total_sold_qty = sum(flt(row.qty) for row in sold_rows)
+    total_manufactured_qty = sum(flt(row.qty) for row in manufactured_rows)
+    item_rcp_map: dict[str, float] = {}
+
+    for row in sold_rows:
+        qty = flt(row.qty)
+        item_rcp_map[row.item_key] = item_rcp_map.get(row.item_key, 0) + (
+            qty / total_sold_qty * totals["direct_total"] if total_sold_qty else 0
+        )
+
+    for row in manufactured_rows:
+        qty = flt(row.qty)
+        item_rcp_map[row.item_key] = item_rcp_map.get(row.item_key, 0) + (
+            qty / total_manufactured_qty * totals["indirect_total"] if total_manufactured_qty else 0
+        )
+
+    return item_rcp_map
+
+
 def get_reference_month_date():
     latest_posting_date = frappe.db.sql(
         """
