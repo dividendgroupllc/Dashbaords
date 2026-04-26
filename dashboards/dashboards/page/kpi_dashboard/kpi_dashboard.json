@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-23 22:33:22.187604",
+ "modified": "2026-04-27 02:42:48.542671",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "kpi-dashboard",
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "КПЭ"
+ "title": "KPI"
 }

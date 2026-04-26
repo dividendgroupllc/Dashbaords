@@ -33,8 +33,8 @@ TAB_ITEMS = [
 
 KPI_ITEMS = [
     {"key": "sales_total", "label": "Сумма продаж"},
-    {"key": "cost_total", "label": "Себестоимость", "subtext": "Продажи"},
-    {"key": "margin_total", "label": "Маржа", "subtext": "После возвратов"},
+    {"key": "cost_total", "label": "Себестоимость"},
+    {"key": "margin_total", "label": "Маржа"},
     {"key": "rsp_total", "label": "Сумма РСП"},
     {"key": "return_total", "label": "Сумма возвратов"},
     {"key": "kg_total", "label": "КГ"},

@@ -5,6 +5,7 @@ frappe.provide("dashboards.ui");
 	const DRAWER_OPEN_KEY = "dashboards:sidebar:drawer-open";
 	const SCOPE_CLASS = "custom-dashboard-scope";
 	const MENU_ITEMS = [
+		{ label: __("Main Dashboard"), route: "main-dashboard-static" },
 		{ label: __("ГЛАВНЫЙ"), route: "main-dashboard" },
 		{ label: __("Дашборд"), route: "page-dashboard" },
 		{ label: __("КПЭ"), route: "kpi-dashboard" },

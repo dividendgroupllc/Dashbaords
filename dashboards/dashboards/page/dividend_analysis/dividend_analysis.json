@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-23 22:33:22.298467",
+ "modified": "2026-04-27 02:42:48.647622",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "dividend-analysis",
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Анализ дивидендов"
+ "title": "Dividend Analysis"
 }

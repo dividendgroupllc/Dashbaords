@@ -1,15 +1,15 @@
 {
  "content": null,
- "creation": "2026-04-12 00:00:00",
+ "creation": "2026-04-24 00:00:00",
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-27 02:42:49.060721",
+ "modified": "2026-04-24 00:00:00",
  "modified_by": "Administrator",
  "module": "Dashboards",
- "name": "customer-comparison",
+ "name": "main-dashboard-static",
  "owner": "Administrator",
- "page_name": "customer-comparison",
+ "page_name": "main-dashboard-static",
  "roles": [
   {
    "role": "investor"
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Customer Comparison"
+ "title": "Main Dashboard"
 }

@@ -171,12 +171,14 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.render_table(
 			"sales-by-month",
 			((this.context.sales_by_month_by_year || {})[this.selectedYear]) || [],
-			["Месяц", "Сумма продаж"]
+			["Месяц", "Сум прод"],
+			"Продажа"
 		);
 		this.render_table(
 			"returns-by-month",
 			((this.context.returns_by_month_by_year || {})[this.selectedYear]) || [],
-			["Месяц", "Возврат"]
+			["Месяц", "Возврат"],
+			"Возврат"
 		);
 		this.render_table(
 			"product-margin",
@@ -195,9 +197,10 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		);
 	}
 
-	render_table(key, rows, headers) {
+	render_table(key, rows, headers, title = null) {
 		const $slot = this.page.main.find(`[data-table="${key}"]`);
 		$slot.html(`
+			${title ? `<div class="dashboard-page-table-title">${frappe.utils.escape_html(title)}</div>` : ""}
 			<table class="dashboard-page-table">
 				<thead>
 					<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>

@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-23 22:33:22.683067",
+ "modified": "2026-04-27 02:42:48.968094",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "comparison-by-amount",
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Сравнение по сумме"
+ "title": "Comparison by Amount"
 }

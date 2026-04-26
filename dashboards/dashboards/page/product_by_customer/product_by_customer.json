@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-23 22:33:22.926679",
+ "modified": "2026-04-27 02:42:49.105853",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "product-by-customer",
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Товары по клиентам"
+ "title": "Product by Customer"
 }
