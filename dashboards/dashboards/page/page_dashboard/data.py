@@ -423,34 +423,35 @@ def get_avg_cost_chart_data(year: str | None = None) -> dict[str, Any]:
 
 def get_avg_check_chart_data(year: str | None = None) -> dict[str, Any]:
     selected_year = year or get_default_year()
-    clause, params = _year_filter_clause(selected_year)
+    clause, params = _year_filter_clause(selected_year, alias="si")
     rows = frappe.db.sql(
         f"""
         SELECT
-            MONTH(posting_date) AS month_no,
-            posting_date,
-            currency,
-            company,
-            COUNT(name) AS invoice_count,
-            SUM(COALESCE(net_total, 0)) AS sales_total
-        FROM `tabSales Invoice`
-        WHERE docstatus = 1
-          AND COALESCE(is_return, 0) = 0
+            MONTH(si.posting_date) AS month_no,
+            si.posting_date,
+            si.currency,
+            si.company,
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_total
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(posting_date), posting_date, currency, company
-        ORDER BY MONTH(posting_date), posting_date
+        GROUP BY MONTH(si.posting_date), si.posting_date, si.currency, si.company
+        ORDER BY MONTH(si.posting_date), si.posting_date
         """,
         params,
         as_dict=True,
     )
-    month_totals = {month_no: {"sales": 0.0, "count": 0.0} for month_no in range(1, 13)}
+    month_totals = {month_no: {"sales": 0.0, "qty": 0.0} for month_no in range(1, 13)}
     for row in rows:
         month_totals[row.month_no]["sales"] += convert_to_reporting_currency(
             row.sales_total, row.currency, row.posting_date, row.company
         )
-        month_totals[row.month_no]["count"] += flt(row.invoice_count)
+        month_totals[row.month_no]["qty"] += flt(row.qty_total)
     month_map = {
-        month_no: (values["sales"] / values["count"] if values["count"] else 0)
+        month_no: (values["sales"] / values["qty"] if values["qty"] else 0)
         for month_no, values in month_totals.items()
     }
     return {

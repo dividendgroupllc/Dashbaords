@@ -14,9 +14,8 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		});
 		this.selectedYear = null;
 		this.metricColumns = {
-			price_trend: { label: "Средняя себестоимость", totalLabel: "Макс" },
 			check_trend: { label: "Средний чек", totalLabel: "Макс" },
-			kg_trend: { label: "КГ", totalLabel: "Всего" },
+			price_trend: { label: "Средняя себестоимость", totalLabel: "Макс" },
 		};
 
 		this.make_layout();
@@ -265,37 +264,40 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 			<div class="dashboard-page-month-metrics">
 				<div class="dashboard-page-month-metrics-head">
 					<div class="is-month">${__("Месяц")}</div>
-					<div class="is-metric">${frappe.utils.escape_html(this.metricColumns.price_trend.label)}</div>
 					<div class="is-metric">${frappe.utils.escape_html(this.metricColumns.check_trend.label)}</div>
-					<div class="is-metric">${frappe.utils.escape_html("Проданные товары, кг")}</div>
+					<div class="is-metric">${frappe.utils.escape_html(this.metricColumns.price_trend.label)}</div>
+					<div class="is-metric">${frappe.utils.escape_html("Фарқ")}</div>
 				</div>
 				<div class="dashboard-page-month-metrics-body">
 					${rows
 						.map(
-							(row) => `
+							(row) => {
+								const difference = row.metrics.check_trend.value - row.metrics.price_trend.value;
+								return `
 								<div class="dashboard-page-month-metrics-row">
 									<div class="is-month">${frappe.utils.escape_html(row.label)}</div>
-									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.price_trend.value))}</div>
 									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.check_trend.value))}</div>
-									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.kg_trend.value))}</div>
+									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.price_trend.value))}</div>
+									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(difference))}</div>
 								</div>
-							`
+							`;
+							}
 						)
 						.join("")}
 				</div>
 				<div class="dashboard-page-month-metrics-total">
 					<div class="is-month">${__("Итог")}</div>
 					<div class="is-metric">
-						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.price_trend.totalLabel)}</div>
-						<div>${frappe.utils.escape_html(this.formatInteger(totals.price_trend))}</div>
-					</div>
-					<div class="is-metric">
 						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.check_trend.totalLabel)}</div>
 						<div>${frappe.utils.escape_html(this.formatInteger(totals.check_trend))}</div>
 					</div>
 					<div class="is-metric">
-						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.kg_trend.totalLabel)}</div>
-						<div>${frappe.utils.escape_html(this.formatInteger(totals.kg_trend))}</div>
+						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.price_trend.totalLabel)}</div>
+						<div>${frappe.utils.escape_html(this.formatInteger(totals.price_trend))}</div>
+					</div>
+					<div class="is-metric">
+						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html("Фарқ")}</div>
+						<div>${frappe.utils.escape_html(this.formatInteger(totals.check_trend - totals.price_trend))}</div>
 					</div>
 				</div>
 			</div>
