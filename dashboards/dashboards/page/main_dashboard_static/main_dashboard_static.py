@@ -14,10 +14,10 @@ from dashboards.dashboards.dashboard_data import (
     get_creditor_total,
     get_debtor_balance_rows,
     get_debtor_total,
+    get_monthly_net_profit_from_profit_and_loss,
     get_other_income_total,
     get_rcp_totals,
     get_monthly_sales_from_profit_and_loss,
-    get_sales_total_for_period,
     get_stock_total,
     get_tax_total,
 )
@@ -286,20 +286,13 @@ def _get_returns_analysis_data(year: str) -> dict[str, Any]:
 
 def _get_profitability_chart_data(year: str) -> dict[str, Any]:
     sales_metrics = _get_monthly_sales_metrics(year)
-    return_metrics = _get_monthly_return_metrics(year)
+    net_profit_metrics = get_monthly_net_profit_from_profit_and_loss(year)
     series = []
 
     for month_no, month_label in enumerate(SHORT_MONTHS, start=1):
         sales_amount = flt(sales_metrics[month_no]["sales_amount"])
-        cost_amount = flt(sales_metrics[month_no]["cost_amount"]) or flt(get_cogs_total(year, month_no))
-        return_amount = flt(return_metrics[month_no]["return_amount"])
-        operating_expenses = flt(get_rcp_totals(year, month_no)["rcp_total"])
-        taxes_amount = flt(get_tax_total(year, month_no))
-        other_income_amount = flt(get_other_income_total(year, month_no))
-
-        revenue_amount = sales_amount - return_amount
-        net_profit_amount = revenue_amount - cost_amount - operating_expenses - taxes_amount + other_income_amount
-        profitability_percent = _safe_div(net_profit_amount * 100, revenue_amount)
+        net_profit_amount = flt(net_profit_metrics.get(month_no))
+        profitability_percent = _safe_div(net_profit_amount * 100, sales_amount)
 
         series.append(
             {

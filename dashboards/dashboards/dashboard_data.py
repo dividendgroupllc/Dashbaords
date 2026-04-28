@@ -15,6 +15,7 @@ _DEBTOR_ACCOUNT_CACHE: list[str] | None = None
 _CREDITOR_ACCOUNT_CACHE: list[str] | None = None
 _SALES_ACCOUNT_CACHE: list[str] | None = None
 _MONTHLY_SALES_PL_CACHE: dict[str, dict[int, float]] = {}
+_MONTHLY_NET_PROFIT_PL_CACHE: dict[str, dict[int, float]] = {}
 _TARGET_DEBTOR_ACCOUNT = "1311 - Debtors UZS - P"
 _TARGET_STOCK_ACCOUNT = "1410 - Сырьё склад - P"
 _TARGET_SALES_ACCOUNT = "4110 - Sales - P"
@@ -373,17 +374,21 @@ def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
         return month_map
 
     from erpnext.accounts.report.profit_and_loss_statement import profit_and_loss_statement
+    from erpnext.accounts.utils import get_fiscal_year
+
+    fiscal_year = get_fiscal_year(latest_posting_date, company=company)[0]
 
     filters = frappe._dict(
         {
             "company": company,
-            "from_fiscal_year": year_key,
-            "to_fiscal_year": year_key,
+            "from_fiscal_year": fiscal_year,
+            "to_fiscal_year": fiscal_year,
             "period_start_date": f"{cint(year)}-01-01",
             "period_end_date": str(getdate(latest_posting_date)),
             "filter_based_on": "Date Range",
             "periodicity": "Monthly",
             "accumulated_values": 0,
+            "include_default_book_entries": 1,
             "presentation_currency": REPORTING_CURRENCY,
         }
     )
@@ -426,6 +431,90 @@ def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
             month_map[month_no] = flt(target_row.get(fieldname))
 
     _MONTHLY_SALES_PL_CACHE[year_key] = month_map
+    return month_map
+
+
+def get_monthly_net_profit_from_profit_and_loss(year: str) -> dict[int, float]:
+    year_key = str(year)
+    if year_key in _MONTHLY_NET_PROFIT_PL_CACHE:
+        return _MONTHLY_NET_PROFIT_PL_CACHE[year_key]
+
+    company = get_default_company()
+    if not company:
+        month_map = {month_no: 0.0 for month_no in range(1, 13)}
+        _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
+        return month_map
+
+    latest_posting_date = frappe.db.sql(
+        """
+        SELECT MAX(posting_date) AS posting_date
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND YEAR(posting_date) = %(year)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        """,
+        {"company": company, "year": cint(year)},
+        as_dict=True,
+    )[0].posting_date
+
+    if not latest_posting_date:
+        month_map = {month_no: 0.0 for month_no in range(1, 13)}
+        _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
+        return month_map
+
+    from erpnext.accounts.report.profit_and_loss_statement import profit_and_loss_statement
+    from erpnext.accounts.utils import get_fiscal_year
+
+    fiscal_year = get_fiscal_year(latest_posting_date, company=company)[0]
+    filters = frappe._dict(
+        {
+            "company": company,
+            "from_fiscal_year": fiscal_year,
+            "to_fiscal_year": fiscal_year,
+            "period_start_date": f"{cint(year)}-01-01",
+            "period_end_date": str(getdate(latest_posting_date)),
+            "filter_based_on": "Date Range",
+            "periodicity": "Monthly",
+            "accumulated_values": 0,
+            "include_default_book_entries": 1,
+            "presentation_currency": REPORTING_CURRENCY,
+        }
+    )
+    columns, data, *_rest = profit_and_loss_statement.execute(filters)
+
+    target_row = next(
+        (row for row in data if str(row.get("account") or "").strip("'") == "Profit for the year"),
+        None,
+    )
+
+    month_map = {month_no: 0.0 for month_no in range(1, 13)}
+    if target_row:
+        for column in columns:
+            fieldname = str(column.get("fieldname") or "")
+            if "_" not in fieldname:
+                continue
+            month_label = fieldname.split("_", 1)[0]
+            try:
+                month_no = {
+                    "jan": 1,
+                    "feb": 2,
+                    "mar": 3,
+                    "apr": 4,
+                    "may": 5,
+                    "jun": 6,
+                    "jul": 7,
+                    "aug": 8,
+                    "sep": 9,
+                    "oct": 10,
+                    "nov": 11,
+                    "dec": 12,
+                }[month_label]
+            except KeyError:
+                continue
+            month_map[month_no] = flt(target_row.get(fieldname))
+
+    _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
     return month_map
 
 
