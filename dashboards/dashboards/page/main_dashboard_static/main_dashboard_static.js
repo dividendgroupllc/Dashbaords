@@ -50,7 +50,6 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 						<section class="mds-card mds-card--wide mds-sales-card">
 							<div class="mds-card-head">
 								<h2>SALES VOLUME (TONS)</h2>
-								<button class="mds-dots" type="button">...</button>
 							</div>
 							<div class="mds-bar-chart" data-region="sales-chart"></div>
 						</section>
@@ -67,7 +66,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 							<div data-region="balance-details"></div>
 						</section>
 						<section class="mds-card mds-break-card">
-							<div data-region="break-even"></div>
+							<div data-region="unit-cost"></div>
 						</section>
 						<section class="mds-card mds-returns-card">
 							<h2>RETURNS ANALYSIS</h2>
@@ -102,7 +101,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.$marginBonus = this.page.main.find('[data-region="margin-bonus"]');
 		this.$averageCheck = this.page.main.find('[data-region="average-check"]');
 		this.$balanceDetails = this.page.main.find('[data-region="balance-details"]');
-		this.$breakEven = this.page.main.find('[data-region="break-even"]');
+		this.$unitCost = this.page.main.find('[data-region="unit-cost"]');
 	}
 
 	bind_events() {
@@ -203,7 +202,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.$marginBonus.html(loadingMarkup);
 		this.$averageCheck.html(loadingMarkup);
 		this.$balanceDetails.html(loadingMarkup);
-		this.$breakEven.html(loadingMarkup);
+		this.$unitCost.html(loadingMarkup);
 	}
 
 	render() {
@@ -213,7 +212,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.render_margin_bonus();
 		this.render_average_check();
 		this.render_balance_details();
-		this.render_break_even();
+		this.render_unit_cost();
 		this.render_profit_chart();
 	}
 
@@ -308,6 +307,8 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 
 	render_average_check() {
 		const data = this.data?.average_check || {};
+		const healthRatio = Number(data.health_ratio || 0);
+		const healthRatioCapped = Math.max(0, Math.min(100, Number(data.health_ratio_capped || 0)));
 		this.$averageCheck.html(`
 			<h2>AVERAGE CHECK</h2>
 			<div class="mds-price-row">
@@ -323,6 +324,37 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 					<strong class="is-muted">${frappe.utils.escape_html(data.cost_price_display || "0 UZS")}</strong>
 				</div>
 				${this.render_delta_badge(data.cost_change, data.cost_change_display)}
+			</div>
+			<div class="mds-health-card">
+				<div class="mds-health-head">
+					<div>
+						<span>Business Health</span>
+						<strong>${frappe.utils.escape_html(data.health_ratio_display || "0.0%")}</strong>
+					</div>
+					<em class="${healthRatio <= 30 ? "is-good" : healthRatio <= 50 ? "is-warn" : "is-risk"}">
+						Qarz / Savdo
+					</em>
+				</div>
+				<div class="mds-health-bar">
+					<div class="mds-health-scale"></div>
+					<div class="mds-health-pointer" style="left: ${healthRatioCapped}%;"></div>
+				</div>
+				<div class="mds-health-ticks">
+					<span>0%</span>
+					<span>30%</span>
+					<span>50%</span>
+					<span>100%</span>
+				</div>
+				<div class="mds-health-meta">
+					<div>
+						<span>Qarz</span>
+						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
+					</div>
+					<div>
+						<span>Savdo</span>
+						<strong>${frappe.utils.escape_html(data.health_sales_display || "0 UZS")}</strong>
+					</div>
+				</div>
 			</div>
 		`);
 	}
@@ -342,16 +374,17 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		`);
 	}
 
-	render_break_even() {
-		const data = this.data?.break_even || {};
-		const planRatio = Math.max(0, Math.min(100, Number(data.plan_ratio || 0)));
-		const currentRatio = Math.max(planRatio, Math.min(100, Number(data.current_ratio || 0)));
+	render_unit_cost() {
+		const breakEven = this.data?.break_even || {};
+		const data = this.data?.unit_cost || {};
+		const planRatio = Math.max(0, Math.min(100, Number(breakEven.plan_ratio || 0)));
+		const currentRatio = Math.max(planRatio, Math.min(100, Number(breakEven.current_ratio || 0)));
 		const greenWidth = Math.max(currentRatio - planRatio, 0);
-		this.$breakEven.html(`
+		this.$unitCost.html(`
 			<h2>BREAK-EVEN</h2>
 			<div class="mds-progress-head">
-				<span class="mds-progress-title">${frappe.utils.escape_html(data.title || "Production Progress")}</span>
-				<strong class="mds-progress-summary">${frappe.utils.escape_html(data.summary || "0t / 0t")}</strong>
+				<span class="mds-progress-title">${frappe.utils.escape_html(breakEven.title || "Production Progress")}</span>
+				<strong class="mds-progress-summary">${frappe.utils.escape_html(breakEven.summary || "0t / 0t")}</strong>
 			</div>
 			<div class="mds-progress" style="--mds-plan-ratio:${planRatio}%; --mds-current-ratio:${currentRatio}%; --mds-green-width:${greenWidth}%;">
 				<div class="mds-progress-line mds-progress-line--red"></div>
@@ -361,14 +394,27 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 				<span class="mds-progress-dot mds-progress-dot--current"></span>
 			</div>
 			<div class="mds-progress-scale">
-				<span class="mds-progress-badge mds-progress-badge--start">${frappe.utils.escape_html(data.start_label || "0t")}</span>
-				<span class="mds-progress-badge mds-progress-badge--plan">${frappe.utils.escape_html(data.plan_label || "Plan: 0t")}</span>
-				<span class="mds-progress-badge mds-progress-badge--current">${frappe.utils.escape_html(data.current_label || "Current: 0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--start">${frappe.utils.escape_html(breakEven.start_label || "0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--plan">${frappe.utils.escape_html(breakEven.plan_label || "Plan: 0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--current">${frappe.utils.escape_html(breakEven.current_label || "Current: 0t")}</span>
 			</div>
-			<div class="mds-debt-card">
-				<div class="mds-mini-donut"></div>
-				<div><strong>Debt vs Sales</strong><span>${frappe.utils.escape_html(data.debt_sales_label || "0% / 0%")}</span></div>
-				<i>i</i>
+			<div class="mds-unit-card">
+				<div class="mds-unit-card-head">
+					<span class="mds-unit-period">${frappe.utils.escape_html(data.period_label || "-")}</span>
+					<strong>${frappe.utils.escape_html(data.title || "1 kg kolbasa uchun xarajat")}</strong>
+				</div>
+				<div class="mds-unit-value">${frappe.utils.escape_html(data.unit_cost_display || "0.00 UZS")}</div>
+				<div class="mds-unit-formula">${frappe.utils.escape_html(data.formula_label || "Xarajat / kg")}</div>
+				<div class="mds-unit-stats">
+					<div class="mds-unit-stat">
+						<span>Jami xarajat</span>
+						<strong>${frappe.utils.escape_html(data.production_cost_display || "0.00 UZS")}</strong>
+					</div>
+					<div class="mds-unit-stat">
+						<span>Ishlab chiqarilgan</span>
+						<strong>${frappe.utils.escape_html(data.manufactured_qty_display || "0.00 kg")}</strong>
+					</div>
+				</div>
 			</div>
 		`);
 	}
@@ -377,8 +423,24 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		const profitData = this.data?.net_profit_profitability?.series || [];
 		const maxProfitValue = Math.max(100, ...profitData.map((row) => Number(row.profit || 0)));
 		const maxProfitabilityValue = Math.max(10, ...profitData.map((row) => Number(row.profitability || 0)));
-		const axisTop = Math.ceil(maxProfitValue / 100) * 100;
-		const axisValues = [axisTop, Math.round(axisTop * 0.66), Math.round(axisTop * 0.33), 0];
+		const axisPadding = Math.max(maxProfitValue * 0.2, 10);
+		const axisTop = Math.ceil((maxProfitValue + axisPadding) / 10) * 10;
+		const axisValues = [axisTop, axisTop * (2 / 3), axisTop * (1 / 3), 0];
+		const formatAxisValue = (value) => {
+			if (!value) {
+				return "0 K";
+			}
+
+			const absoluteAmount = value * 1000;
+			if (Math.abs(absoluteAmount) >= 1000000) {
+				const millions = absoluteAmount / 1000000;
+				const roundedMillions = Math.abs(millions) >= 10 ? Math.round(millions) : Number(millions.toFixed(1));
+				return `${roundedMillions} M`;
+			}
+
+			const roundedThousands = value >= 10 ? Math.round(value) : Number(value.toFixed(1));
+			return `${roundedThousands} K`;
+		};
 		this.$profitChart.html(`
 			<div class="mds-profit-plot">
 				<div class="mds-profit-axis">
@@ -386,7 +448,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 						.map(
 							(value) => `
 								<div class="mds-profit-axis-row">
-									<span class="mds-profit-axis-label">${value}K</span>
+									<span class="mds-profit-axis-label">${formatAxisValue(value)}</span>
 									<span class="mds-profit-axis-line"></span>
 								</div>
 							`
@@ -398,7 +460,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 						.map((row) => {
 							const profitValue = Number(row.profit || 0);
 							const profitabilityValue = Number(row.profitability || 0);
-							const profitHeight = profitValue ? Math.max((profitValue / maxProfitValue) * 100, 3) : 0;
+							const profitHeight = profitValue ? Math.max((profitValue / axisTop) * 100, 3) : 0;
 							const profitabilityHeight = profitabilityValue ? Math.max((profitabilityValue / maxProfitabilityValue) * 100, 3) : 0;
 							return `
 								<div class="mds-profit-group">

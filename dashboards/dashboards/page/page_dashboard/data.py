@@ -6,7 +6,14 @@ from typing import Any
 import frappe
 from frappe.utils import flt, getdate, today
 
-from dashboards.dashboards.dashboard_data import MONTH_LABELS, format_number, get_cogs_total, get_rcp_totals
+from dashboards.dashboards.dashboard_data import (
+    MONTH_LABELS,
+    convert_company_currency_amount,
+    convert_to_reporting_currency,
+    format_number,
+    get_cogs_total,
+    get_rcp_totals,
+)
 
 
 def get_dashboard_years() -> list[str]:
@@ -58,6 +65,20 @@ def _resolve_year(filters=None) -> str:
     return get_default_year()
 
 
+def _sum_document_currency_rows(rows: list[dict[str, Any]], amount_field: str) -> float:
+    return sum(
+        convert_to_reporting_currency(row.get(amount_field), row.get("currency"), row.get("posting_date"), row.get("company"))
+        for row in rows
+    )
+
+
+def _sum_company_currency_rows(rows: list[dict[str, Any]], amount_field: str) -> float:
+    return sum(
+        convert_company_currency_amount(row.get(amount_field), row.get("posting_date"), row.get("company"))
+        for row in rows
+    )
+
+
 def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
     invoice_clause, invoice_params = _year_filter_clause(year)
     item_clause, item_params = _year_filter_clause(year, alias="si")
@@ -66,20 +87,26 @@ def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
     invoice_totals = frappe.db.sql(
         f"""
         SELECT
-            SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN COALESCE(base_net_total, net_total, 0) ELSE 0 END) AS sales_total,
-            SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(base_net_total, net_total, 0)) ELSE 0 END) AS return_total,
+            posting_date,
+            currency,
+            company,
+            SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN COALESCE(net_total, 0) ELSE 0 END) AS sales_total,
+            SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(net_total, 0)) ELSE 0 END) AS return_total,
             COUNT(CASE WHEN COALESCE(is_return, 0) = 0 THEN name END) AS invoice_count
         FROM `tabSales Invoice`
         WHERE docstatus = 1
         {invoice_clause}
+        GROUP BY posting_date, currency, company
         """,
         invoice_params,
         as_dict=True,
-    )[0]
+    )
 
     item_totals = frappe.db.sql(
         f"""
         SELECT
+            si.posting_date,
+            si.company,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg_total,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_total
         FROM `tabSales Invoice` si
@@ -87,23 +114,26 @@ def get_dashboard_summary(year: str | None = None) -> dict[str, float]:
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
         {item_clause}
+        GROUP BY si.posting_date, si.company
         """,
         item_params,
         as_dict=True,
-    )[0]
+    )
 
-    sales_total = flt(invoice_totals.sales_total)
-    cost_total = flt(item_totals.cost_total) or flt(get_cogs_total(year))
+    sales_total = _sum_document_currency_rows(invoice_totals, "sales_total")
+    cost_total = _sum_company_currency_rows(item_totals, "cost_total") or flt(get_cogs_total(year))
     margin_total = sales_total - cost_total
-    invoice_count = flt(invoice_totals.invoice_count)
+    invoice_count = sum(flt(row.invoice_count) for row in invoice_totals)
+    return_total = _sum_document_currency_rows(invoice_totals, "return_total")
+    kg_total = sum(flt(row.kg_total) for row in item_totals)
 
     return {
         "sales_total": sales_total,
         "cost_total": cost_total,
         "margin_total": margin_total,
         "rsp_total": flt(rcp_totals["rcp_total"]),
-        "return_total": flt(invoice_totals.return_total),
-        "kg_total": flt(item_totals.kg_total),
+        "return_total": return_total,
+        "kg_total": kg_total,
         "avg_check": sales_total / invoice_count if invoice_count else 0,
     }
 
@@ -121,20 +151,23 @@ def get_sales_by_month(year: str | None = None) -> list[list[str]]:
         f"""
         SELECT
             MONTH(posting_date) AS month_no,
-            SUM(COALESCE(base_net_total, net_total, 0)) AS amount
+            posting_date,
+            currency,
+            company,
+            SUM(COALESCE(net_total, 0)) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND COALESCE(is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(posting_date)
-        ORDER BY MONTH(posting_date)
+        GROUP BY MONTH(posting_date), posting_date, currency, company
+        ORDER BY MONTH(posting_date), posting_date
         """,
         params,
         as_dict=True,
     )
 
     for row in rows:
-        month_map[row.month_no] = flt(row.amount)
+        month_map[row.month_no] += convert_to_reporting_currency(row.amount, row.currency, row.posting_date, row.company)
 
     return [[MONTH_LABELS[month_no - 1], format_number(month_map[month_no])] for month_no in range(1, 13)]
 
@@ -148,20 +181,23 @@ def get_returns_by_month(year: str | None = None) -> list[list[str]]:
         f"""
         SELECT
             MONTH(posting_date) AS month_no,
-            SUM(ABS(COALESCE(base_net_total, net_total, 0))) AS amount
+            posting_date,
+            currency,
+            company,
+            SUM(ABS(COALESCE(net_total, 0))) AS amount
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND COALESCE(is_return, 0) = 1
         {clause}
-        GROUP BY MONTH(posting_date)
-        ORDER BY MONTH(posting_date)
+        GROUP BY MONTH(posting_date), posting_date, currency, company
+        ORDER BY MONTH(posting_date), posting_date
         """,
         params,
         as_dict=True,
     )
 
     for row in rows:
-        month_map[row.month_no] = flt(row.amount)
+        month_map[row.month_no] += convert_to_reporting_currency(row.amount, row.currency, row.posting_date, row.company)
 
     return [[MONTH_LABELS[month_no - 1], format_number(month_map[month_no])] for month_no in range(1, 13)]
 
@@ -174,13 +210,16 @@ def get_product_margin_by_year(limit: int | None = None) -> dict[str, list[list[
         SELECT
             YEAR(si.posting_date) AS year,
             COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар') AS item_label,
-            SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount,
+            si.posting_date,
+            si.currency,
+            si.company,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_amount,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_amount
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
-        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар')
+        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар'), si.posting_date, si.currency, si.company
         """,
         as_dict=True,
     )
@@ -188,22 +227,23 @@ def get_product_margin_by_year(limit: int | None = None) -> dict[str, list[list[
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         year = str(row.year)
-        sales_amount = flt(row.sales_amount)
-        cost_amount = flt(row.cost_amount)
-        margin_amount = sales_amount - cost_amount
-        grouped[year].append(
-            {
-                "label": row.item_label,
-                "sales": sales_amount,
-                "margin": margin_amount,
-                "profitability": (margin_amount / sales_amount * 100) if sales_amount else 0,
-            }
-        )
+        sales_amount = convert_to_reporting_currency(row.sales_amount, row.currency, row.posting_date, row.company)
+        cost_amount = convert_company_currency_amount(row.cost_amount, row.posting_date, row.company)
+        existing = next((item for item in grouped[year] if item["label"] == row.item_label), None)
+        if not existing:
+            existing = {"label": row.item_label, "sales": 0.0, "margin": 0.0}
+            grouped[year].append(existing)
+        existing["sales"] += sales_amount
+        existing["margin"] += sales_amount - cost_amount
 
     for year, values in grouped.items():
         sorted_values = sorted(values, key=lambda row: row["margin"], reverse=True)
         top_rows = [
-            [row["label"], format_number(row["margin"]), f"{row['profitability']:.1f}%".replace(".", ",")]
+            [
+                row["label"],
+                format_number(row["margin"]),
+                f"{((row['margin'] / row['sales']) * 100) if row['sales'] else 0:.1f}%".replace(".", ","),
+            ]
             for row in sorted_values[:limit]
         ]
 
@@ -226,14 +266,17 @@ def get_client_kpi_by_year(limit: int | None = None) -> dict[str, list[list[str 
         SELECT
             YEAR(si.posting_date) AS year,
             COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент') AS client,
+            si.posting_date,
+            si.currency,
+            si.company,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
-            SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_amount,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_amount
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
-        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент')
+        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент'), si.posting_date, si.currency, si.company
         """,
         as_dict=True,
     )
@@ -241,18 +284,15 @@ def get_client_kpi_by_year(limit: int | None = None) -> dict[str, list[list[str 
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         year = str(row.year)
-        sales_amount = flt(row.sales_amount)
-        cost_amount = flt(row.cost_amount)
-        margin_amount = sales_amount - cost_amount
-        grouped[year].append(
-            {
-                "client": row.client,
-                "qty": flt(row.qty_total),
-                "sales": sales_amount,
-                "margin": margin_amount,
-                "profitability": (margin_amount / sales_amount * 100) if sales_amount else 0,
-            }
-        )
+        sales_amount = convert_to_reporting_currency(row.sales_amount, row.currency, row.posting_date, row.company)
+        cost_amount = convert_company_currency_amount(row.cost_amount, row.posting_date, row.company)
+        existing = next((item for item in grouped[year] if item["client"] == row.client), None)
+        if not existing:
+            existing = {"client": row.client, "qty": 0.0, "sales": 0.0, "margin": 0.0}
+            grouped[year].append(existing)
+        existing["qty"] += flt(row.qty_total)
+        existing["sales"] += sales_amount
+        existing["margin"] += sales_amount - cost_amount
 
     for year, values in grouped.items():
         sorted_values = sorted(values, key=lambda row: row["sales"], reverse=True)
@@ -266,7 +306,7 @@ def get_client_kpi_by_year(limit: int | None = None) -> dict[str, list[list[str 
                 row["client"],
                 format_number(row["qty"]),
                 format_number(row["sales"]),
-                f"{row['profitability']:.1f}%".replace(".", ","),
+                f"{((row['margin'] / row['sales']) * 100) if row['sales'] else 0:.1f}%".replace(".", ","),
             ]
             for row in selected_values
         ]
@@ -291,13 +331,16 @@ def get_regional_summary_by_year(limit: int = 10) -> dict[str, list[list[str | b
         SELECT
             YEAR(si.posting_date) AS year,
             COALESCE(NULLIF(si.territory, ''), 'Без территории') AS territory,
-            SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount,
+            si.posting_date,
+            si.currency,
+            si.company,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_amount,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_amount
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
-        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(si.territory, ''), 'Без территории')
+        GROUP BY YEAR(si.posting_date), COALESCE(NULLIF(si.territory, ''), 'Без территории'), si.posting_date, si.currency, si.company
         """,
         as_dict=True,
     )
@@ -305,17 +348,14 @@ def get_regional_summary_by_year(limit: int = 10) -> dict[str, list[list[str | b
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         year = str(row.year)
-        sales_amount = flt(row.sales_amount)
-        cost_amount = flt(row.cost_amount)
-        margin_amount = sales_amount - cost_amount
-        grouped[year].append(
-            {
-                "territory": row.territory,
-                "sales": sales_amount,
-                "margin": margin_amount,
-                "profitability": (margin_amount / sales_amount * 100) if sales_amount else 0,
-            }
-        )
+        sales_amount = convert_to_reporting_currency(row.sales_amount, row.currency, row.posting_date, row.company)
+        cost_amount = convert_company_currency_amount(row.cost_amount, row.posting_date, row.company)
+        existing = next((item for item in grouped[year] if item["territory"] == row.territory), None)
+        if not existing:
+            existing = {"territory": row.territory, "sales": 0.0, "margin": 0.0}
+            grouped[year].append(existing)
+        existing["sales"] += sales_amount
+        existing["margin"] += sales_amount - cost_amount
 
     for year, values in grouped.items():
         sorted_values = sorted(values, key=lambda row: row["sales"], reverse=True)[:limit]
@@ -326,7 +366,7 @@ def get_regional_summary_by_year(limit: int = 10) -> dict[str, list[list[str | b
                 row["territory"],
                 format_number(row["sales"]),
                 format_number(row["margin"]),
-                f"{row['profitability']:.1f}%".replace(".", ","),
+                f"{((row['margin'] / row['sales']) * 100) if row['sales'] else 0:.1f}%".replace(".", ","),
             ]
             for row in sorted_values
         ]
@@ -354,25 +394,33 @@ def _get_month_value_map(query: str, params: dict[str, Any] | None = None) -> di
 def get_avg_cost_chart_data(year: str | None = None) -> dict[str, Any]:
     selected_year = year or get_default_year()
     clause, params = _year_filter_clause(selected_year, alias="si")
-    month_map = _get_month_value_map(
+    rows = frappe.db.sql(
         f"""
         SELECT
             MONTH(si.posting_date) AS month_no,
-            CASE
-                WHEN SUM(COALESCE(sii.stock_qty, sii.qty, 0)) = 0 THEN 0
-                ELSE SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0))
-                    / SUM(COALESCE(sii.stock_qty, sii.qty, 0))
-            END AS value
+            si.posting_date,
+            si.company,
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_total
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(si.posting_date)
-        ORDER BY MONTH(si.posting_date)
+        GROUP BY MONTH(si.posting_date), si.posting_date, si.company
+        ORDER BY MONTH(si.posting_date), si.posting_date
         """,
         params,
+        as_dict=True,
     )
+    month_totals = {month_no: {"cost": 0.0, "qty": 0.0} for month_no in range(1, 13)}
+    for row in rows:
+        month_totals[row.month_no]["qty"] += flt(row.qty_total)
+        month_totals[row.month_no]["cost"] += convert_company_currency_amount(row.cost_total, row.posting_date, row.company)
+    month_map = {
+        month_no: (values["cost"] / values["qty"] if values["qty"] else 0)
+        for month_no, values in month_totals.items()
+    }
     return {
         "labels": MONTH_LABELS,
         "datasets": [{"name": f"Сред себ {selected_year}", "values": [round(month_map[i]) for i in range(1, 13)]}],
@@ -382,23 +430,35 @@ def get_avg_cost_chart_data(year: str | None = None) -> dict[str, Any]:
 def get_avg_check_chart_data(year: str | None = None) -> dict[str, Any]:
     selected_year = year or get_default_year()
     clause, params = _year_filter_clause(selected_year)
-    month_map = _get_month_value_map(
+    rows = frappe.db.sql(
         f"""
         SELECT
             MONTH(posting_date) AS month_no,
-            CASE
-                WHEN COUNT(name) = 0 THEN 0
-                ELSE SUM(COALESCE(base_net_total, net_total, 0)) / COUNT(name)
-            END AS value
+            posting_date,
+            currency,
+            company,
+            COUNT(name) AS invoice_count,
+            SUM(COALESCE(net_total, 0)) AS sales_total
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND COALESCE(is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(posting_date)
-        ORDER BY MONTH(posting_date)
+        GROUP BY MONTH(posting_date), posting_date, currency, company
+        ORDER BY MONTH(posting_date), posting_date
         """,
         params,
+        as_dict=True,
     )
+    month_totals = {month_no: {"sales": 0.0, "count": 0.0} for month_no in range(1, 13)}
+    for row in rows:
+        month_totals[row.month_no]["sales"] += convert_to_reporting_currency(
+            row.sales_total, row.currency, row.posting_date, row.company
+        )
+        month_totals[row.month_no]["count"] += flt(row.invoice_count)
+    month_map = {
+        month_no: (values["sales"] / values["count"] if values["count"] else 0)
+        for month_no, values in month_totals.items()
+    }
     return {
         "labels": MONTH_LABELS,
         "datasets": [{"name": f"Сред чек {selected_year}", "values": [round(month_map[i]) for i in range(1, 13)]}],

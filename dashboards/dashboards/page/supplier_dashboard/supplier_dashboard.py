@@ -5,6 +5,8 @@ from typing import Any
 import frappe
 from frappe.utils import flt, get_first_day, get_last_day, getdate, today
 
+from dashboards.dashboards.dashboard_data import convert_company_currency_amount, convert_to_reporting_currency
+
 
 def _get_company_details() -> tuple[str, str]:
 	company = (
@@ -15,8 +17,7 @@ def _get_company_details() -> tuple[str, str]:
 	if not company:
 		return "Компания", "UZS"
 
-	currency = frappe.db.get_value("Company", company, "default_currency") or "UZS"
-	return company, currency
+	return company, "UZS"
 
 
 def _get_reference_date():
@@ -62,14 +63,17 @@ def _get_supplier_invoice_rows(start_date: str, end_date: str) -> list[dict[str,
 		SELECT
 			pi.supplier,
 			COALESCE(NULLIF(pi.supplier_name, ''), pi.supplier) AS supplier_name,
+			pi.posting_date,
+			pi.currency,
+			pi.company,
 			SUM(CASE WHEN pi.posting_date < %(start_date)s
-				THEN COALESCE(pi.base_grand_total, pi.grand_total, 0) ELSE 0 END) AS opening_base_amount,
+				THEN COALESCE(pi.grand_total, 0) ELSE 0 END) AS opening_amount,
 			SUM(CASE WHEN pi.posting_date BETWEEN %(start_date)s AND %(end_date)s
-				THEN COALESCE(pi.base_grand_total, pi.grand_total, 0) ELSE 0 END) AS inflow_base_amount
+				THEN COALESCE(pi.grand_total, 0) ELSE 0 END) AS inflow_amount
 		FROM `tabPurchase Invoice` pi
 		WHERE pi.docstatus = 1
 		  AND COALESCE(pi.is_return, 0) = 0
-		GROUP BY pi.supplier, supplier_name
+		GROUP BY pi.supplier, supplier_name, pi.posting_date, pi.currency, pi.company
 		""",
 		{"start_date": start_date, "end_date": end_date},
 		as_dict=True,
@@ -82,14 +86,16 @@ def _get_supplier_payment_rows(start_date: str, end_date: str) -> list[dict[str,
 		SELECT
 			pe.party AS supplier,
 			COALESCE(NULLIF(sup.supplier_name, ''), pe.party) AS supplier_name,
+			pe.posting_date,
+			pe.company,
 			SUM(CASE WHEN pe.posting_date < %(start_date)s AND acc.account_type = 'Cash'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_cash_base_amount,
+				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_cash_amount,
 			SUM(CASE WHEN pe.posting_date < %(start_date)s AND acc.account_type = 'Bank'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_bank_base_amount,
+				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_bank_amount,
 			SUM(CASE WHEN pe.posting_date BETWEEN %(start_date)s AND %(end_date)s AND acc.account_type = 'Cash'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS cash_payment_base_amount,
+				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS cash_payment_amount,
 			SUM(CASE WHEN pe.posting_date BETWEEN %(start_date)s AND %(end_date)s AND acc.account_type = 'Bank'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS bank_payment_base_amount
+				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS bank_payment_amount
 		FROM `tabPayment Entry` pe
 		LEFT JOIN `tabSupplier` sup ON sup.name = pe.party
 		LEFT JOIN `tabAccount` acc ON acc.name = pe.paid_from
@@ -97,7 +103,7 @@ def _get_supplier_payment_rows(start_date: str, end_date: str) -> list[dict[str,
 		  AND pe.payment_type = 'Pay'
 		  AND pe.party_type = 'Supplier'
 		  AND pe.party IS NOT NULL
-		GROUP BY pe.party, supplier_name
+		GROUP BY pe.party, supplier_name, pe.posting_date, pe.company
 		""",
 		{"start_date": start_date, "end_date": end_date},
 		as_dict=True,
@@ -109,14 +115,20 @@ def _build_supplier_rows(start_date: str, end_date: str) -> tuple[list[dict[str,
 
 	for row in _get_supplier_invoice_rows(start_date, end_date):
 		key = row.supplier
-		suppliers[key] = {
-			"supplier": row.supplier,
-			"supplier_name": row.supplier_name,
-			"opening_base": flt(row.opening_base_amount),
-			"inflow_base": flt(row.inflow_base_amount),
-			"cash_payment_base": 0.0,
-			"bank_payment_base": 0.0,
-		}
+		entry = suppliers.setdefault(
+			key,
+			{
+				"supplier": row.supplier,
+				"supplier_name": row.supplier_name,
+				"opening_base": 0.0,
+				"inflow_base": 0.0,
+				"cash_payment_base": 0.0,
+				"bank_payment_base": 0.0,
+			},
+		)
+		entry.update({"supplier": row.supplier, "supplier_name": row.supplier_name})
+		entry["opening_base"] += convert_to_reporting_currency(row.opening_amount, row.currency, row.posting_date, row.company)
+		entry["inflow_base"] += convert_to_reporting_currency(row.inflow_amount, row.currency, row.posting_date, row.company)
 
 	for row in _get_supplier_payment_rows(start_date, end_date):
 		key = row.supplier
@@ -131,9 +143,13 @@ def _build_supplier_rows(start_date: str, end_date: str) -> tuple[list[dict[str,
 				"bank_payment_base": 0.0,
 			},
 		)
-		entry["cash_payment_base"] += flt(row.cash_payment_base_amount)
-		entry["bank_payment_base"] += flt(row.bank_payment_base_amount)
-		entry["opening_base"] -= flt(row.opening_cash_base_amount) + flt(row.opening_bank_base_amount)
+		entry["cash_payment_base"] += convert_company_currency_amount(row.cash_payment_amount, row.posting_date, row.company)
+		entry["bank_payment_base"] += convert_company_currency_amount(row.bank_payment_amount, row.posting_date, row.company)
+		entry["opening_base"] -= convert_company_currency_amount(
+			flt(row.opening_cash_amount) + flt(row.opening_bank_amount),
+			row.posting_date,
+			row.company,
+		)
 
 	rows = []
 	totals = {

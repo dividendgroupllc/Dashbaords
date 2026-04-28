@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import frappe
-from frappe.utils import cint, flt, getdate, today
+from frappe.utils import cint, flt, get_last_day, getdate, today
 
-from dashboards.dashboards.dashboard_data import format_number, get_cogs_total, get_rcp_totals
+from dashboards.dashboards.dashboard_data import (
+    convert_company_currency_amount,
+    convert_to_reporting_currency,
+    format_number,
+    get_cogs_total,
+    get_creditor_total,
+    get_debtor_balance_rows,
+    get_debtor_total,
+    get_other_income_total,
+    get_rcp_totals,
+    get_monthly_sales_from_profit_and_loss,
+    get_sales_total_for_period,
+    get_stock_total,
+    get_tax_total,
+)
 
 
 SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -38,9 +53,11 @@ def _compact_number(value: float, precision: int = 1) -> str:
     absolute = abs(flt(value))
     suffix = ""
     divisor = 1
+    effective_precision = precision
     if absolute >= 1_000_000_000:
         divisor = 1_000_000_000
         suffix = "B"
+        effective_precision = 3
     elif absolute >= 1_000_000:
         divisor = 1_000_000
         suffix = "M"
@@ -50,10 +67,19 @@ def _compact_number(value: float, precision: int = 1) -> str:
 
     if suffix:
         compact = flt(value) / divisor
-        text = f"{compact:.{precision}f}".rstrip("0").rstrip(".")
+        factor = 10 ** effective_precision
+        truncated = math.trunc(compact * factor) / factor
+        text = f"{truncated:.{effective_precision}f}".rstrip("0").rstrip(".")
         return f"{text}{suffix}"
 
     return format_number(value, precision=0)
+
+
+def _compact_money_label(value: float, precision: int = 1) -> str:
+    compact = _compact_number(value, precision=precision)
+    if compact and compact[-1].isalpha():
+        return f"{compact[:-1]} {compact[-1]}"
+    return compact
 
 
 def _format_uzs(value: float) -> str:
@@ -135,14 +161,17 @@ def _get_monthly_sales_metrics(year: str) -> dict[int, dict[str, float]]:
         f"""
         SELECT
             MONTH(si.posting_date) AS month_no,
+            si.posting_date,
+            si.currency,
+            si.company,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
-            SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_amount,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_amount,
             SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS discount_total,
             SUM(
                 CASE
                     WHEN COALESCE(sii.is_free_item, 0) = 1
-                        THEN COALESCE(sii.base_price_list_rate, sii.price_list_rate, 0) * COALESCE(sii.qty, 0)
+                        THEN COALESCE(sii.price_list_rate, 0) * COALESCE(sii.qty, 0)
                     ELSE 0
                 END
             ) AS bonus_total
@@ -151,7 +180,7 @@ def _get_monthly_sales_metrics(year: str) -> dict[int, dict[str, float]]:
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(si.posting_date)
+        GROUP BY MONTH(si.posting_date), si.posting_date, si.currency, si.company
         """,
         params,
         as_dict=True,
@@ -159,13 +188,20 @@ def _get_monthly_sales_metrics(year: str) -> dict[int, dict[str, float]]:
 
     month_map = _empty_month_map(lambda: {"qty_total": 0.0, "sales_amount": 0.0, "cost_amount": 0.0, "discount_total": 0.0, "bonus_total": 0.0})
     for row in rows:
-        month_map[row.month_no] = {
-            "qty_total": flt(row.qty_total),
-            "sales_amount": flt(row.sales_amount),
-            "cost_amount": flt(row.cost_amount),
-            "discount_total": flt(row.discount_total),
-            "bonus_total": flt(row.bonus_total),
-        }
+        month_map[row.month_no]["qty_total"] += flt(row.qty_total)
+        month_map[row.month_no]["cost_amount"] += convert_company_currency_amount(
+            row.cost_amount, row.posting_date, row.company
+        )
+        month_map[row.month_no]["discount_total"] += convert_to_reporting_currency(
+            row.discount_total, row.currency, row.posting_date, row.company
+        )
+        month_map[row.month_no]["bonus_total"] += convert_to_reporting_currency(
+            row.bonus_total, row.currency, row.posting_date, row.company
+        )
+
+    sales_amounts = get_monthly_sales_from_profit_and_loss(year)
+    for month_no in range(1, 13):
+        month_map[month_no]["sales_amount"] = flt(sales_amounts.get(month_no))
     return month_map
 
 
@@ -175,14 +211,17 @@ def _get_monthly_return_metrics(year: str) -> dict[int, dict[str, float]]:
         f"""
         SELECT
             MONTH(posting_date) AS month_no,
+            posting_date,
+            currency,
+            company,
             SUM(ABS(COALESCE(total_qty, 0))) AS qty_total,
-            SUM(ABS(COALESCE(base_net_total, net_total, 0))) AS return_amount,
+            SUM(ABS(COALESCE(net_total, 0))) AS return_amount,
             SUM(COALESCE(loyalty_amount, 0)) AS loyalty_bonus
         FROM `tabSales Invoice`
         WHERE docstatus = 1
           AND COALESCE(is_return, 0) = 1
         {clause}
-        GROUP BY MONTH(posting_date)
+        GROUP BY MONTH(posting_date), posting_date, currency, company
         """,
         params,
         as_dict=True,
@@ -190,11 +229,13 @@ def _get_monthly_return_metrics(year: str) -> dict[int, dict[str, float]]:
 
     month_map = _empty_month_map(lambda: {"return_qty_total": 0.0, "return_amount": 0.0, "loyalty_bonus": 0.0})
     for row in rows:
-        month_map[row.month_no] = {
-            "return_qty_total": flt(row.qty_total),
-            "return_amount": flt(row.return_amount),
-            "loyalty_bonus": flt(row.loyalty_bonus),
-        }
+        month_map[row.month_no]["return_qty_total"] += flt(row.qty_total)
+        month_map[row.month_no]["return_amount"] += convert_to_reporting_currency(
+            row.return_amount, row.currency, row.posting_date, row.company
+        )
+        month_map[row.month_no]["loyalty_bonus"] += convert_to_reporting_currency(
+            row.loyalty_bonus, row.currency, row.posting_date, row.company
+        )
     return month_map
 
 
@@ -250,20 +291,21 @@ def _get_profitability_chart_data(year: str) -> dict[str, Any]:
 
     for month_no, month_label in enumerate(SHORT_MONTHS, start=1):
         sales_amount = flt(sales_metrics[month_no]["sales_amount"])
-        cost_amount = flt(sales_metrics[month_no]["cost_amount"])
-        discount_total = flt(sales_metrics[month_no]["discount_total"])
+        cost_amount = flt(sales_metrics[month_no]["cost_amount"]) or flt(get_cogs_total(year, month_no))
         return_amount = flt(return_metrics[month_no]["return_amount"])
-        rcp_totals = get_rcp_totals(year, month_no)
+        operating_expenses = flt(get_rcp_totals(year, month_no)["rcp_total"])
+        taxes_amount = flt(get_tax_total(year, month_no))
+        other_income_amount = flt(get_other_income_total(year, month_no))
 
-        margin_amount = sales_amount - cost_amount
-        net_profit_amount = margin_amount - discount_total - return_amount - flt(rcp_totals["rcp_total"])
-        profitability_percent = _safe_div(net_profit_amount * 100, sales_amount)
+        revenue_amount = sales_amount - return_amount
+        net_profit_amount = revenue_amount - cost_amount - operating_expenses - taxes_amount + other_income_amount
+        profitability_percent = _safe_div(net_profit_amount * 100, revenue_amount)
 
         series.append(
             {
                 "month": month_label,
                 "profit": round(net_profit_amount / 1000, 2),
-                "profit_display": f"{round(net_profit_amount / 1000):g}K" if net_profit_amount else "0K",
+                "profit_display": _compact_money_label(net_profit_amount) if net_profit_amount else "0 K",
                 "profitability": round(profitability_percent, 2),
                 "profitability_display": _format_percent(profitability_percent),
             }
@@ -323,10 +365,7 @@ def _get_manufactured_qty(year: str, month: str | None = None) -> float:
         FROM (
             SELECT
                 se.name,
-                CASE
-                    WHEN COALESCE(MAX(se.fg_completed_qty), 0) > 0 THEN COALESCE(MAX(se.fg_completed_qty), 0)
-                    ELSE SUM(CASE WHEN COALESCE(sed.is_finished_item, 0) = 1 THEN COALESCE(sed.qty, 0) ELSE 0 END)
-                END AS entry_qty
+                SUM(CASE WHEN COALESCE(sed.is_finished_item, 0) = 1 THEN COALESCE(sed.qty, 0) ELSE 0 END) AS entry_qty
             FROM `tabStock Entry` se
             LEFT JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
             WHERE se.docstatus = 1
@@ -341,6 +380,58 @@ def _get_manufactured_qty(year: str, month: str | None = None) -> float:
     )[0]
 
     return flt(row.manufactured_qty)
+
+
+def _get_manufacturing_cost_total(year: str, month: str | None = None) -> float:
+    params = {"year": cint(year)}
+    month_no = _month_no(month)
+    month_clause = ""
+    if month_no:
+        params["month"] = month_no
+        month_clause = " AND MONTH(se.posting_date) = %(month)s"
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            posting_date,
+            company,
+            SUM(entry_total_cost) AS total_cost
+        FROM (
+            SELECT
+                se.name,
+                se.posting_date,
+                se.company,
+                SUM(
+                    CASE
+                        WHEN COALESCE(sed.is_finished_item, 0) = 0
+                            THEN ABS(COALESCE(sed.basic_amount, 0))
+                        ELSE 0
+                    END
+                ) + MAX(COALESCE(se.total_additional_costs, 0)) AS entry_total_cost
+            FROM `tabStock Entry` se
+            LEFT JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
+            WHERE se.docstatus = 1
+              AND (se.stock_entry_type = 'Manufacture' OR se.purpose = 'Manufacture')
+              AND YEAR(se.posting_date) = %(year)s
+              {month_clause}
+            GROUP BY se.name, se.posting_date, se.company
+        ) manufacture_entries
+        GROUP BY posting_date, company
+        """,
+        params,
+        as_dict=True,
+    )
+
+    total_cost = sum(
+        convert_company_currency_amount(row.total_cost, row.posting_date, row.company)
+        for row in rows
+    )
+    if total_cost:
+        return total_cost
+
+    fallback_cogs = flt(get_cogs_total(year, month_no))
+    fallback_indirect = flt(get_rcp_totals(year, month_no)["indirect_total"])
+    return fallback_cogs + fallback_indirect
 
 
 def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
@@ -375,6 +466,12 @@ def _get_average_check_data(year: str, month: str) -> dict[str, Any]:
     current_cost_amount = flt(totals["cost_amount"]) or flt(get_cogs_total(year, _month_no(month)))
     current_sales_price = _safe_div(totals["sales_amount"], current_qty)
     current_cost_price = _safe_div(current_cost_amount, current_qty)
+    sales_amount = flt(totals["sales_amount"])
+    month_no = _month_no(month) or 12
+    period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
+    debtor_total = get_debtor_total(period_end=period_end)
+    health_ratio = _safe_div(debtor_total * 100, sales_amount)
+    health_ratio_capped = min(max(health_ratio, 0), 100)
 
     previous_year, previous_month = _get_previous_period(year, month)
     previous_totals = _get_period_totals(previous_year, previous_month)
@@ -395,6 +492,33 @@ def _get_average_check_data(year: str, month: str) -> dict[str, Any]:
         "cost_price_display": _format_uzs(current_cost_price),
         "cost_change": cost_change,
         "cost_change_display": _format_percent(cost_change),
+        "health_ratio": health_ratio,
+        "health_ratio_display": _format_percent(health_ratio),
+        "health_ratio_capped": health_ratio_capped,
+        "health_sales_display": _format_uzs(sales_amount),
+        "health_debt_display": _format_uzs(debtor_total),
+    }
+
+
+def _get_unit_cost_data(year: str, month: str) -> dict[str, Any]:
+    previous_year, previous_month = _get_previous_period(year, month)
+    previous_month_no = _month_no(previous_month)
+    manufactured_qty = flt(_get_manufactured_qty(previous_year, previous_month))
+    production_cost = flt(_get_manufacturing_cost_total(previous_year, previous_month))
+    unit_cost = _safe_div(production_cost, manufactured_qty)
+    period_label = f"{previous_month} {previous_year}"
+
+    return {
+        "title": "1 kg kolbasa uchun xarajat",
+        "period_label": period_label,
+        "unit_cost": unit_cost,
+        "unit_cost_display": _format_uzs(unit_cost),
+        "production_cost": production_cost,
+        "production_cost_display": _format_uzs(production_cost),
+        "manufactured_qty": manufactured_qty,
+        "manufactured_qty_display": f"{format_number(manufactured_qty, precision=2)} kg",
+        "formula_label": "O'tgan oy xarajati / ishlab chiqarilgan kg",
+        "month_no": previous_month_no,
     }
 
 
@@ -404,6 +528,7 @@ def _get_inventory_breakdown() -> tuple[dict[str, float], dict[str, float]]:
         SELECT
             bin.warehouse,
             wh.warehouse_type,
+            %(today)s AS posting_date,
             SUM(COALESCE(bin.stock_value, 0)) AS stock_value
         FROM `tabBin` bin
         INNER JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
@@ -413,6 +538,7 @@ def _get_inventory_breakdown() -> tuple[dict[str, float], dict[str, float]]:
         HAVING SUM(COALESCE(bin.stock_value, 0)) <> 0
         ORDER BY SUM(COALESCE(bin.stock_value, 0)) DESC
         """,
+        {"today": str(getdate(today()))},
         as_dict=True,
     )
 
@@ -421,7 +547,7 @@ def _get_inventory_breakdown() -> tuple[dict[str, float], dict[str, float]]:
     for row in rows:
         warehouse_name = str(row.warehouse or "")
         warehouse_type = str(row.warehouse_type or "")
-        stock_value = flt(row.stock_value)
+        stock_value = convert_company_currency_amount(row.stock_value, row.posting_date)
         classification_key = f"{warehouse_name} {warehouse_type}".lower()
         if "work in progress" in classification_key or "wip" in classification_key or "hsu" in classification_key:
             wip_rows[warehouse_name] = stock_value
@@ -443,59 +569,163 @@ def _top_breakdown_rows(rows: dict[str, float], empty_label: str) -> list[list[s
     ]
 
 
-def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
-    stock_rows, wip_rows = _get_inventory_breakdown()
-    stock_total = sum(stock_rows.values())
-    wip_total = sum(wip_rows.values())
+def _get_party_balance_rows(account_type: str, year: str, month: str) -> dict[str, float]:
+    month_no = _month_no(month) or 12
+    period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
 
-    debt_total = flt(
-        frappe.db.sql(
-            """
-            SELECT SUM(outstanding_amount) AS outstanding_amount
-            FROM `tabSales Invoice`
-            WHERE docstatus = 1
-              AND COALESCE(is_return, 0) = 0
-              AND outstanding_amount > 0
-            """,
-            as_dict=True,
-        )[0].outstanding_amount
-        or 0
+    if account_type == "Payable":
+        return _get_payable_outstanding_rows(year, month)
+    if account_type == "Receivable":
+        return get_debtor_balance_rows(period_end=period_end)
+
+    period_start = f"{cint(year)}-{month_no:02d}-01"
+    balance_direction = "1" if account_type == "Receivable" else "-1"
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(NULLIF(gle.party, ''), NULLIF(gle.against, ''), acc.account_name, acc.name) AS party_label,
+            gle.posting_date,
+            gle.company,
+            ({balance_direction} * SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0))) AS balance
+        FROM `tabGL Entry` gle
+        INNER JOIN `tabAccount` acc ON acc.name = gle.account
+        WHERE gle.is_cancelled = 0
+          AND acc.is_group = 0
+          AND acc.account_type = %(account_type)s
+          AND gle.posting_date <= LAST_DAY(%(period_start)s)
+        GROUP BY COALESCE(NULLIF(gle.party, ''), NULLIF(gle.against, ''), acc.account_name, acc.name), gle.posting_date, gle.company
+        ORDER BY balance DESC, party_label ASC
+        """,
+        {"account_type": account_type, "period_start": period_start},
+        as_dict=True,
     )
 
-    period_totals = _get_period_totals(year, month)
-    sales_total = flt(period_totals["sales_amount"])
-    debt_ratio = _safe_div(debt_total * 100, debt_total + sales_total)
-    sales_ratio = 100 - debt_ratio if debt_total + sales_total else 0
+    balances_by_party: dict[str, float] = {}
+    for row in rows:
+        party_label = str(row.party_label or "Unknown")
+        balances_by_party[party_label] = balances_by_party.get(party_label, 0) + convert_company_currency_amount(
+            row.balance, row.posting_date, row.company
+        )
+
+    return {
+        party_label: balance
+        for party_label, balance in balances_by_party.items()
+        if flt(balance) > 0
+    }
+
+
+def _get_payable_outstanding_rows(year: str, month: str) -> dict[str, float]:
+    month_no = _month_no(month) or 12
+    period_end = f"{cint(year)}-{month_no:02d}-01"
+    payable_accounts = frappe.get_all(
+        "Account",
+        filters={
+            "account_type": "Payable",
+            "disabled": 0,
+            "is_group": 0,
+        },
+        or_filters={
+            "account_number": ("like", "2111%"),
+            "name": ("like", "2111%"),
+        },
+        pluck="name",
+    )
+
+    if not payable_accounts:
+        payable_accounts = frappe.get_all(
+            "Account",
+            filters={
+                "account_type": "Payable",
+                "disabled": 0,
+                "is_group": 0,
+                "name": ("like", "Creditors%"),
+            },
+            pluck="name",
+        )
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            COALESCE(NULLIF(gle.party, ''), NULLIF(gle.against, ''), gle.account) AS party_label,
+            gle.posting_date,
+            gle.company,
+            SUM(COALESCE(gle.credit, 0) - COALESCE(gle.debit, 0)) AS balance
+        FROM `tabGL Entry` gle
+        WHERE gle.docstatus = 1
+          AND gle.is_cancelled = 0
+          AND gle.account IN %(accounts)s
+          AND gle.posting_date <= LAST_DAY(%(period_end)s)
+        GROUP BY COALESCE(NULLIF(gle.party, ''), NULLIF(gle.against, ''), gle.account), gle.posting_date, gle.company
+        ORDER BY party_label ASC
+        """,
+        {"accounts": tuple(payable_accounts), "period_end": period_end},
+        as_dict=True,
+    )
+
+    balances_by_party: dict[str, float] = {}
+    for row in rows:
+        balance = flt(row.balance)
+        if not balance:
+            continue
+
+        party_label = str(row.party_label or "Unknown")
+        balances_by_party[party_label] = balances_by_party.get(party_label, 0) + convert_company_currency_amount(
+            balance, row.posting_date, row.company
+        )
+
+    return {
+        party_label: balance
+        for party_label, balance in balances_by_party.items()
+        if flt(balance)
+    }
+
+
+def _top_party_breakdown_rows(rows: dict[str, float], empty_label: str) -> list[list[str]]:
+    if not rows:
+        return [[empty_label, "0 UZS"], ["Tracked Parties", "0"]]
+
+    sorted_rows = sorted(rows.items(), key=lambda item: item[1], reverse=True)
+    top_label, top_value = sorted_rows[0]
+    return [
+        [top_label, _format_uzs(top_value)],
+        ["Tracked Parties", str(len(sorted_rows))],
+    ]
+
+
+def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
+    stock_rows, _wip_rows = _get_inventory_breakdown()
+    month_no = _month_no(month) or 12
+    period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
+    stock_total = get_stock_total(period_end=period_end)
+    debtor_rows = _get_party_balance_rows("Receivable", year, month)
+    creditor_rows = _get_party_balance_rows("Payable", year, month)
+    debtor_total = get_debtor_total(period_end=period_end)
+    creditor_total = get_creditor_total(period_end=period_end)
 
     items = [
         {
             "label": "Sklad (Stock)",
             "value": _format_uzs(stock_total),
-            "details": _top_breakdown_rows(stock_rows, "No stock warehouse"),
+            "details": [[ "1410 - Сырьё склад - P", _format_uzs(stock_total) ]],
             "open": False,
         },
         {
-            "label": "HSU (WIP)",
-            "value": _format_uzs(wip_total),
-            "details": _top_breakdown_rows(wip_rows, "No WIP warehouse"),
+            "label": "Qarzdor",
+            "value": _format_uzs(debtor_total),
+            "details": _top_party_breakdown_rows(debtor_rows, "No debtor"),
             "open": False,
         },
         {
-            "label": "Qarz / Saudo",
-            "value": f"{round(debt_ratio):g}% / {round(sales_ratio):g}%",
-            "details": [
-                ["Debt (Qarz)", _format_percent(debt_ratio, 0)],
-                ["Sales (Saudo)", _format_percent(sales_ratio, 0)],
-            ],
+            "label": "Haqdor",
+            "value": _format_uzs(creditor_total),
+            "details": _top_party_breakdown_rows(creditor_rows, "No creditor"),
             "open": True,
         },
     ]
 
     return {
         "items": items,
-        "total_balance": _format_uzs(stock_total + wip_total + debt_total),
-        "debt_ratio": debt_ratio,
-        "sales_ratio": sales_ratio,
+        "total_balance": _format_uzs(stock_total + debtor_total - creditor_total),
     }
 
 
@@ -517,19 +747,9 @@ def _get_break_even_data(year: str, month: str) -> dict[str, Any]:
     plan_ratio = min(_safe_div(plan_tons * 100, max_tons), 100)
     current_ratio = min(_safe_div(current_tons * 100, max_tons), 100)
 
-    debt_total = flt(
-        frappe.db.sql(
-            """
-            SELECT SUM(outstanding_amount) AS outstanding_amount
-            FROM `tabSales Invoice`
-            WHERE docstatus = 1
-              AND COALESCE(is_return, 0) = 0
-              AND outstanding_amount > 0
-            """,
-            as_dict=True,
-        )[0].outstanding_amount
-        or 0
-    )
+    month_no = _month_no(month) or 12
+    period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
+    debt_total = flt(get_debtor_total(period_end=period_end) or 0)
     debt_vs_sales_total = debt_total + sales_amount
     debt_ratio = _safe_div(debt_total * 100, debt_vs_sales_total)
     sales_ratio = 100 - debt_ratio if debt_vs_sales_total else 0
@@ -559,6 +779,7 @@ def get_dashboard_data(year: str | None = None, month: str | None = None) -> dic
         "average_check": _get_average_check_data(selected_year, selected_month),
         "balance_details": _get_balance_details_data(selected_year, selected_month),
         "break_even": _get_break_even_data(selected_year, selected_month),
+        "unit_cost": _get_unit_cost_data(selected_year, selected_month),
         "returns_analysis": _get_returns_analysis_data(selected_year),
         "net_profit_profitability": _get_profitability_chart_data(selected_year),
     }

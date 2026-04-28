@@ -141,7 +141,7 @@
 .mds-content {
 	display: grid;
 	grid-template-columns: repeat(12, minmax(0, 1fr));
-	gap: 32px;
+	gap: 14px;
 }
 
 .mds-card {
@@ -402,7 +402,7 @@
 }
 
 .mds-price-row strong {
-	font-size: 42px;
+	font-size: 32px;
 	line-height: 1;
 }
 
@@ -428,11 +428,210 @@
 	color: var(--mds-red);
 }
 
+.mds-health-card {
+	display: grid;
+	gap: 14px;
+	margin-top: 16px;
+	padding: 18px 18px 16px;
+	border: 1px solid #e5ebf4;
+	border-radius: 12px;
+	background: linear-gradient(180deg, #fbfcff 0%, #f5f8fd 100%);
+}
+
+.mds-health-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.mds-health-head span,
+.mds-health-meta span {
+	display: block;
+	margin-bottom: 6px;
+	color: #6a7486;
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.mds-health-head strong {
+	font-size: 28px;
+	line-height: 1;
+}
+
+.mds-health-head em {
+	display: inline-flex;
+	align-items: center;
+	padding: 7px 11px;
+	border-radius: 999px;
+	font-style: normal;
+	font-size: 12px;
+	font-weight: 900;
+	white-space: nowrap;
+}
+
+.mds-health-head .is-good {
+	background: #dff8ee;
+	color: #007a54;
+}
+
+.mds-health-head .is-warn {
+	background: #fff2cf;
+	color: #a66a00;
+}
+
+.mds-health-head .is-risk {
+	background: #fde7e7;
+	color: var(--mds-red);
+}
+
+.mds-health-bar {
+	position: relative;
+	padding-top: 14px;
+}
+
+.mds-health-scale {
+	height: 14px;
+	border-radius: 999px;
+	background: linear-gradient(90deg, #6ff4b2 0 30%, #ffe27a 30% 50%, #ff8a8a 50% 100%);
+	box-shadow: inset 0 1px 3px rgba(31, 48, 82, 0.14), 0 8px 18px rgba(31, 48, 82, 0.08);
+}
+
+.mds-health-pointer {
+	position: absolute;
+	top: 0;
+	width: 16px;
+	height: 16px;
+	border: 3px solid #fff;
+	border-radius: 50%;
+	background: #0c1830;
+	box-shadow: 0 8px 16px rgba(15, 23, 42, 0.2);
+	transform: translateX(-50%);
+}
+
+.mds-health-ticks {
+	position: relative;
+	height: 16px;
+	color: #728198;
+	font-size: 11px;
+	font-weight: 800;
+}
+
+.mds-health-ticks span {
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+}
+
+.mds-health-ticks span:nth-child(1) {
+	left: 0;
+	transform: none;
+}
+
+.mds-health-ticks span:nth-child(2) {
+	left: 30%;
+}
+
+.mds-health-ticks span:nth-child(3) {
+	left: 50%;
+}
+
+.mds-health-ticks span:nth-child(4) {
+	left: 100%;
+	transform: translateX(-100%);
+}
+
+.mds-health-meta {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	padding-top: 6px;
+}
+
+.mds-health-meta strong {
+	font-size: 16px;
+	line-height: 1.25;
+}
+
 .mds-balance-card,
 .mds-break-card {
 	display: grid;
 	align-content: start;
 	gap: 16px;
+}
+
+.mds-unit-card {
+	display: grid;
+	gap: 18px;
+	padding: 20px;
+	border: 1px solid #dbe4f0;
+	border-radius: 12px;
+	background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	margin-top: 10px;
+}
+
+.mds-unit-card-head {
+	display: grid;
+	gap: 6px;
+}
+
+.mds-unit-card-head strong {
+	font-size: 20px;
+	line-height: 1.2;
+}
+
+.mds-unit-period {
+	display: inline-flex;
+	align-items: center;
+	justify-self: start;
+	padding: 7px 12px;
+	border: 1px solid rgba(11, 93, 196, 0.14);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.86);
+	color: var(--mds-blue);
+	font-size: 13px;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+}
+
+.mds-unit-value {
+	font-size: 34px;
+	font-weight: 900;
+	line-height: 1;
+	color: #082a63;
+}
+
+.mds-unit-formula {
+	color: #5d6b80;
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.mds-unit-stats {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.mds-unit-stat {
+	display: grid;
+	gap: 8px;
+	padding: 14px 16px;
+	border: 1px solid #e1e8f3;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.86);
+}
+
+.mds-unit-stat span {
+	color: #617086;
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.mds-unit-stat strong {
+	font-size: 18px;
+	line-height: 1.25;
 }
 
 .mds-balance-item {
@@ -722,8 +921,12 @@
 }
 
 .mds-profit-chart {
+	--mds-profit-chart-height: 332px;
+	--mds-profit-month-row-height: 44px;
 	margin-top: 22px;
+	height: calc(var(--mds-profit-chart-height) + var(--mds-profit-month-row-height) + 20px);
 	overflow-x: auto;
+	overflow-y: hidden;
 }
 
 .mds-profit-plot {
@@ -744,31 +947,53 @@
 	position: absolute;
 	top: 8px;
 	right: 12px;
-	bottom: 54px;
-	left: 94px;
+	bottom: calc(8px + var(--mds-profit-month-row-height));
+	left: 64px;
 	background:
-		linear-gradient(180deg, transparent calc(25% - 1px), rgba(137, 154, 181, 0.18) calc(25% - 1px), rgba(137, 154, 181, 0.18) 25%, transparent 25%),
-		linear-gradient(180deg, transparent calc(50% - 1px), rgba(137, 154, 181, 0.18) calc(50% - 1px), rgba(137, 154, 181, 0.18) 50%, transparent 50%),
-		linear-gradient(180deg, transparent calc(75% - 1px), rgba(137, 154, 181, 0.18) calc(75% - 1px), rgba(137, 154, 181, 0.18) 75%, transparent 75%);
+		linear-gradient(rgba(137, 154, 181, 0.18), rgba(137, 154, 181, 0.18)) top / 100% 1px no-repeat,
+		linear-gradient(rgba(137, 154, 181, 0.18), rgba(137, 154, 181, 0.18)) center top 33.333% / 100% 1px no-repeat,
+		linear-gradient(rgba(137, 154, 181, 0.18), rgba(137, 154, 181, 0.18)) center top 66.667% / 100% 1px no-repeat,
+		linear-gradient(rgba(137, 154, 181, 0.18), rgba(137, 154, 181, 0.18)) bottom / 100% 1px no-repeat;
 	pointer-events: none;
 }
 
 .mds-profit-axis {
-	display: grid;
-	grid-template-rows: repeat(4, 1fr);
-	height: 376px;
+	position: relative;
+	height: var(--mds-profit-chart-height);
 }
 
 .mds-profit-axis-row {
-	display: contents;
+	position: absolute;
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: center;
+	transform: translateY(-50%);
+}
+
+.mds-profit-axis-row:nth-child(1) {
+	top: 0;
+}
+
+.mds-profit-axis-row:nth-child(2) {
+	top: 33.333%;
+}
+
+.mds-profit-axis-row:nth-child(3) {
+	top: 66.667%;
+}
+
+.mds-profit-axis-row:nth-child(4) {
+	top: 100%;
 }
 
 .mds-profit-axis-label {
-	align-self: end;
-	padding-bottom: 0;
+	display: inline-flex;
+	align-items: center;
 	color: #243246;
 	font-size: 16px;
 	font-weight: 500;
+	line-height: 1;
 	letter-spacing: 0.02em;
 }
 
@@ -780,16 +1005,16 @@
 	position: relative;
 	display: grid;
 	gap: 0;
-	align-items: end;
-	height: 376px;
-	border-bottom: 2px solid rgba(63, 82, 115, 0.22);
+	align-items: start;
+	height: calc(var(--mds-profit-chart-height) + var(--mds-profit-month-row-height));
+	/* border-bottom: 2px solid rgba(63, 82, 115, 0.22); */
 }
 
 .mds-profit-group {
 	position: relative;
 	display: grid;
-	grid-template-rows: minmax(0, 1fr) auto;
-	align-items: center;
+	grid-template-rows: var(--mds-profit-chart-height) var(--mds-profit-month-row-height);
+	align-items: start;
 	gap: 16px;
 	height: 100%;
 }
@@ -812,10 +1037,10 @@
 	display: flex;
 	align-items: flex-end;
 	justify-content: center;
-	gap: 8px;
-	padding: 0 12px;
+	gap: 4px;
+	padding: 0 10px;
 	width: 100%;
-	height: 100%;
+	height: var(--mds-profit-chart-height);
 	min-height: 0;
 }
 
@@ -826,7 +1051,7 @@
 	justify-content: flex-end;
 	gap: 10px;
 	height: 100%;
-	width: 36px;
+	width: 10px;
 }
 
 .mds-profit-value {
@@ -835,6 +1060,9 @@
 	line-height: 1;
 	letter-spacing: -0.01em;
 	white-space: nowrap;
+	writing-mode: vertical-rl !important;
+	transform: rotate(180deg) !important;
+	transform-origin: center;
 	transform: translateY(0);
 }
 
@@ -868,6 +1096,9 @@
 }
 
 .mds-profit-month {
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
 	color: #4e607a;
 	font-size: 14px;
 	font-weight: 800;
@@ -969,9 +1200,14 @@
 
 	.mds-price-row,
 	.mds-total-balance,
-	.mds-balance-sub {
+	.mds-balance-sub,
+	.mds-health-head {
 		align-items: flex-start;
 		flex-direction: column;
+	}
+
+	.mds-health-meta {
+		grid-template-columns: 1fr;
 	}
 
 	.mds-progress-head {
