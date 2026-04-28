@@ -394,33 +394,27 @@ def _get_month_value_map(query: str, params: dict[str, Any] | None = None) -> di
 def get_avg_cost_chart_data(year: str | None = None) -> dict[str, Any]:
     selected_year = year or get_default_year()
     clause, params = _year_filter_clause(selected_year, alias="si")
-    rows = frappe.db.sql(
+    qty_map = _get_month_value_map(
         f"""
         SELECT
             MONTH(si.posting_date) AS month_no,
-            si.posting_date,
-            si.company,
-            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
-            SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_total
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS value
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
         {clause}
-        GROUP BY MONTH(si.posting_date), si.posting_date, si.company
-        ORDER BY MONTH(si.posting_date), si.posting_date
+        GROUP BY MONTH(si.posting_date)
+        ORDER BY MONTH(si.posting_date)
         """,
         params,
-        as_dict=True,
     )
-    month_totals = {month_no: {"cost": 0.0, "qty": 0.0} for month_no in range(1, 13)}
-    for row in rows:
-        month_totals[row.month_no]["qty"] += flt(row.qty_total)
-        month_totals[row.month_no]["cost"] += convert_company_currency_amount(row.cost_total, row.posting_date, row.company)
-    month_map = {
-        month_no: (values["cost"] / values["qty"] if values["qty"] else 0)
-        for month_no, values in month_totals.items()
-    }
+    month_map = {}
+    for month_no in range(1, 13):
+        qty_total = flt(qty_map.get(month_no))
+        cogs_total = flt(get_cogs_total(selected_year, month_no))
+        month_map[month_no] = cogs_total / qty_total if qty_total else 0
+
     return {
         "labels": MONTH_LABELS,
         "datasets": [{"name": f"Сред себ {selected_year}", "values": [round(month_map[i]) for i in range(1, 13)]}],

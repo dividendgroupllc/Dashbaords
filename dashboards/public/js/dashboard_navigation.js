@@ -4,7 +4,7 @@ frappe.provide("dashboards.ui");
 	const MENU_OPEN_KEY = "dashboards:sidebar:menu-open";
 	const DRAWER_OPEN_KEY = "dashboards:sidebar:drawer-open";
 	const SCOPE_CLASS = "custom-dashboard-scope";
-	const MENU_ITEMS = [
+	const FALLBACK_MENU_ITEMS = [
 		{ label: __("Main Dashboard"), route: "main-dashboard-static" },
 		{ label: __("ГЛАВНЫЙ"), route: "main-dashboard" },
 		{ label: __("Дашборд"), route: "page-dashboard" },
@@ -23,6 +23,7 @@ frappe.provide("dashboards.ui");
 		{ label: __("Срав. клиентов"), route: "customer-comparison" },
 		{ label: __("Товары по клиентам"), route: "product-by-customer" },
 	];
+	let menuItemsPromise = null;
 
 	function readBool(key, defaultValue) {
 		try {
@@ -46,40 +47,27 @@ frappe.provide("dashboards.ui");
 	}
 
 	function getCurrentLabel(route) {
-		return (MENU_ITEMS.find((item) => item.route === route) || {}).label || __("Дашборды");
+		return (FALLBACK_MENU_ITEMS.find((item) => item.route === route) || {}).label || __("Дашборды");
 	}
 
-	dashboards.ui.setupDashboardSidebar = function setupDashboardSidebar({ page, route }) {
-		if (!page || !page.main || !route) {
-			return;
+	function getMenuItems() {
+		if (!menuItemsPromise) {
+			menuItemsPromise = frappe
+				.call("dashboards.api.get_dashboard_sidebar_items")
+				.then((response) => response.message || [])
+				.catch(() => FALLBACK_MENU_ITEMS);
 		}
 
-		const $main = page.main;
-		const $layout = $main.closest(".layout-main-section-wrapper");
-		if (!$layout.length) {
-			return;
-		}
-		const $pageBody = $layout.closest(".page-body");
-		const $pageWrapper = page.wrapper ? $(page.wrapper) : $layout.closest(".page-wrapper");
-		const $container = $layout.closest(".container");
-		const $pageContainer = $layout.closest(".page-container");
-		const $deskPage = $layout.closest(".desk-page");
-		const $layoutSection = $layout.closest(".layout-main-section");
-		$pageBody.addClass(SCOPE_CLASS);
-		$pageWrapper.addClass(SCOPE_CLASS);
-		$layout.addClass(SCOPE_CLASS);
-		$container.addClass(SCOPE_CLASS);
-		$pageContainer.addClass(SCOPE_CLASS);
-		$deskPage.addClass(SCOPE_CLASS);
-		$layoutSection.addClass(SCOPE_CLASS);
-		const $host = $layoutSection;
-		const $sidebarHost = $host.length ? $host : $layout;
+		return menuItemsPromise;
+	}
+
+	function renderSidebar({ $sidebarHost, route, items }) {
+		const menuItems = items && items.length ? items : FALLBACK_MENU_ITEMS;
+		const menuOpen = readBool(MENU_OPEN_KEY, true);
+		const drawerOpen = readBool(DRAWER_OPEN_KEY, false);
 
 		$sidebarHost.children(".dashboard-sidebar-shell").remove();
 		$sidebarHost.addClass("has-dashboard-floating-sidebar");
-
-		const menuOpen = readBool(MENU_OPEN_KEY, true);
-		const drawerOpen = readBool(DRAWER_OPEN_KEY, false);
 
 		$sidebarHost.prepend(`
 			<div class="dashboard-sidebar-shell ${drawerOpen ? "is-drawer-open" : ""}">
@@ -101,7 +89,7 @@ frappe.provide("dashboards.ui");
 							<span class="dashboard-sidebar-group-arrow" aria-hidden="true"></span>
 						</button>
 						<div class="dashboard-sidebar-items">
-							${MENU_ITEMS.map(
+							${menuItems.map(
 								(item) => `
 									<button
 										class="dashboard-sidebar-item ${item.route === route ? "is-active" : ""}"
@@ -165,6 +153,37 @@ frappe.provide("dashboards.ui");
 
 			syncDrawerState(false);
 			frappe.set_route(targetRoute);
+		});
+	}
+
+	dashboards.ui.setupDashboardSidebar = function setupDashboardSidebar({ page, route }) {
+		if (!page || !page.main || !route) {
+			return;
+		}
+
+		const $main = page.main;
+		const $layout = $main.closest(".layout-main-section-wrapper");
+		if (!$layout.length) {
+			return;
+		}
+		const $pageBody = $layout.closest(".page-body");
+		const $pageWrapper = page.wrapper ? $(page.wrapper) : $layout.closest(".page-wrapper");
+		const $container = $layout.closest(".container");
+		const $pageContainer = $layout.closest(".page-container");
+		const $deskPage = $layout.closest(".desk-page");
+		const $layoutSection = $layout.closest(".layout-main-section");
+		$pageBody.addClass(SCOPE_CLASS);
+		$pageWrapper.addClass(SCOPE_CLASS);
+		$layout.addClass(SCOPE_CLASS);
+		$container.addClass(SCOPE_CLASS);
+		$pageContainer.addClass(SCOPE_CLASS);
+		$deskPage.addClass(SCOPE_CLASS);
+		$layoutSection.addClass(SCOPE_CLASS);
+		const $host = $layoutSection;
+		const $sidebarHost = $host.length ? $host : $layout;
+		renderSidebar({ $sidebarHost, route, items: FALLBACK_MENU_ITEMS });
+		getMenuItems().then((items) => {
+			renderSidebar({ $sidebarHost, route, items });
 		});
 	};
 })();

@@ -13,10 +13,10 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 			single_column: true,
 		});
 		this.selectedYear = null;
-		this.charts = {
-			price_trend: { valueLabel: "Средняя себестоимость", totalLabel: "Макс" },
-			check_trend: { valueLabel: "Средний чек", totalLabel: "Макс" },
-			kg_trend: { valueLabel: "КГ", totalLabel: "Всего" },
+		this.metricColumns = {
+			price_trend: { label: "Средняя себестоимость", totalLabel: "Макс" },
+			check_trend: { label: "Средний чек", totalLabel: "Макс" },
+			kg_trend: { label: "КГ", totalLabel: "Всего" },
 		};
 
 		this.make_layout();
@@ -55,17 +55,9 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 						</div>
 					</div>
 					<div class="dashboard-page-bottom">
-						<div class="dashboard-page-card dashboard-page-chart-card">
-							<div class="dashboard-page-chart-title">Динамика себестоимости по месяцам</div>
-							<div data-chart="price_trend"></div>
-						</div>
-						<div class="dashboard-page-card dashboard-page-chart-card">
-							<div class="dashboard-page-chart-title">Динамика среднего чека по месяцам</div>
-							<div data-chart="check_trend"></div>
-						</div>
-						<div class="dashboard-page-card dashboard-page-chart-card">
-							<div class="dashboard-page-chart-title">Проданные товары по месяцам, кг</div>
-							<div data-chart="kg_trend"></div>
+						<div class="dashboard-page-card dashboard-page-chart-card dashboard-page-chart-card--wide">
+							<div class="dashboard-page-chart-title">Динамика по месяцам</div>
+							<div data-chart="combined-month-metrics"></div>
 						</div>
 						<div class="dashboard-page-card">
 							<div class="dashboard-page-table-slot" data-table="regional-summary"></div>
@@ -241,56 +233,80 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 
 	render_charts() {
 		const yearCharts = (this.context.chart_data_by_year || {})[this.selectedYear] || {};
-		Object.entries(this.charts).forEach(([key, meta]) => {
-			const $container = this.page.main.find(`[data-chart="${key}"]`);
-			this.render_chart_panel($container, yearCharts[key] || { labels: [], datasets: [{ values: [] }] }, meta);
-		});
+		const $container = this.page.main.find('[data-chart="combined-month-metrics"]');
+		this.render_combined_chart_panel($container, yearCharts);
 	}
 
-	render_chart_panel($container, chartData, meta) {
-		const labels = chartData.labels || [];
-		const values = ((chartData.datasets || [])[0] || {}).values || [];
-		const maxValue = values.length ? Math.max(...values, 0) : 0;
-		const totalValue = keyTotals(meta.totalLabel, values);
+	render_combined_chart_panel($container, yearCharts) {
+		const monthLabels =
+			(yearCharts.price_trend && yearCharts.price_trend.labels) ||
+			(yearCharts.check_trend && yearCharts.check_trend.labels) ||
+			(yearCharts.kg_trend && yearCharts.kg_trend.labels) ||
+			[];
+		const rows = monthLabels.map((label, index) => {
+			const metrics = {};
+			Object.entries(this.metricColumns).forEach(([key, meta]) => {
+				const values = ((((yearCharts[key] || {}).datasets || [])[0] || {}).values) || [];
+				const value = Number(values[index] || 0);
+				metrics[key] = {
+					value,
+					label: meta.label,
+				};
+			});
+			return { label, metrics };
+		});
+		const totals = {};
+		Object.entries(this.metricColumns).forEach(([key, meta]) => {
+			const values = ((((yearCharts[key] || {}).datasets || [])[0] || {}).values) || [];
+			totals[key] = this.getMetricTotal(meta.totalLabel, values);
+		});
 
 		$container.html(`
-			<div class="dashboard-page-mini-chart">
-				<div class="dashboard-page-mini-chart-head">
+			<div class="dashboard-page-month-metrics">
+				<div class="dashboard-page-month-metrics-head">
 					<div class="is-month">${__("Месяц")}</div>
-					<div class="is-value">${frappe.utils.escape_html(meta.valueLabel)}</div>
-					<div class="is-bar"></div>
+					<div class="is-metric">${frappe.utils.escape_html(this.metricColumns.price_trend.label)}</div>
+					<div class="is-metric">${frappe.utils.escape_html(this.metricColumns.check_trend.label)}</div>
+					<div class="is-metric">${frappe.utils.escape_html("Проданные товары, кг")}</div>
 				</div>
-				<div class="dashboard-page-mini-chart-body">
-					${labels
-						.map((label, index) => {
-							const value = Number(values[index] || 0);
-							const width = maxValue ? Math.max((value / maxValue) * 100, 4) : 0;
-							return `
-								<div class="dashboard-page-mini-chart-row">
-									<div class="is-month">${frappe.utils.escape_html(label)}</div>
-									<div class="is-value">${frappe.utils.escape_html(this.formatInteger(value))}</div>
-									<div class="is-bar">
-										<div class="dashboard-page-mini-chart-bar" style="width:${width}%"></div>
-									</div>
+				<div class="dashboard-page-month-metrics-body">
+					${rows
+						.map(
+							(row) => `
+								<div class="dashboard-page-month-metrics-row">
+									<div class="is-month">${frappe.utils.escape_html(row.label)}</div>
+									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.price_trend.value))}</div>
+									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.check_trend.value))}</div>
+									<div class="is-metric">${frappe.utils.escape_html(this.formatInteger(row.metrics.kg_trend.value))}</div>
 								</div>
-							`;
-						})
+							`
+						)
 						.join("")}
 				</div>
-				<div class="dashboard-page-mini-chart-total">
-					<div class="is-month">${frappe.utils.escape_html(meta.totalLabel)}</div>
-					<div class="is-value">${frappe.utils.escape_html(this.formatInteger(totalValue))}</div>
-					<div class="is-bar"></div>
+				<div class="dashboard-page-month-metrics-total">
+					<div class="is-month">${__("Итог")}</div>
+					<div class="is-metric">
+						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.price_trend.totalLabel)}</div>
+						<div>${frappe.utils.escape_html(this.formatInteger(totals.price_trend))}</div>
+					</div>
+					<div class="is-metric">
+						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.check_trend.totalLabel)}</div>
+						<div>${frappe.utils.escape_html(this.formatInteger(totals.check_trend))}</div>
+					</div>
+					<div class="is-metric">
+						<div class="dashboard-page-month-metrics-total-label">${frappe.utils.escape_html(this.metricColumns.kg_trend.totalLabel)}</div>
+						<div>${frappe.utils.escape_html(this.formatInteger(totals.kg_trend))}</div>
+					</div>
 				</div>
 			</div>
 		`);
+	}
 
-		function keyTotals(totalLabel, valuesList) {
-			if (totalLabel === "Макс") {
-				return valuesList.length ? Math.max(...valuesList, 0) : 0;
-			}
-			return valuesList.reduce((sum, value) => sum + Number(value || 0), 0);
+	getMetricTotal(totalLabel, valuesList) {
+		if (totalLabel === "Макс") {
+			return valuesList.length ? Math.max(...valuesList, 0) : 0;
 		}
+		return valuesList.reduce((sum, value) => sum + Number(value || 0), 0);
 	}
 
 	formatInteger(value) {
