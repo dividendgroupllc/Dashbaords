@@ -715,7 +715,7 @@ def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
 
     return {
         "items": items,
-        "total_balance": _format_uzs(stock_total + debtor_total - creditor_total),
+        "total_balance": _format_uzs(stock_total + debtor_total - creditor_total + cash_total),
     }
 
 
