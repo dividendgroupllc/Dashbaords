@@ -263,6 +263,24 @@ def convert_company_currency_amount(
     return convert_to_reporting_currency(amount, get_company_currency(company), transaction_date, company)
 
 
+def convert_company_currency_amount_like_report(
+    amount: float | int | None,
+    transaction_date: Any,
+    company: str | None = None,
+) -> float:
+    value = flt(amount)
+    if not value:
+        return 0
+
+    company_currency = get_company_currency(company)
+    if company_currency == REPORTING_CURRENCY:
+        return value
+
+    from erpnext.accounts.report.utils import convert
+
+    return flt(convert(value, REPORTING_CURRENCY, company_currency, getdate(transaction_date or today())))
+
+
 def get_gl_account_total(account_name: str, period_end: str | None = None) -> float:
     return get_gl_accounts_total([account_name], period_end=period_end)
 
@@ -338,19 +356,13 @@ def get_sales_total_for_period(from_date: str, to_date: str) -> float:
     return get_gl_accounts_period_total(sales_accounts, from_date, to_date)
 
 
-def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
-    year_key = str(year)
-    if year_key in _MONTHLY_SALES_PL_CACHE:
-        return _MONTHLY_SALES_PL_CACHE[year_key]
-
+def get_sales_profit_and_loss_period_end(year: str | int) -> Any:
     sales_accounts = set(get_sales_account_names())
     company = frappe.db.get_value("Account", next(iter(sales_accounts), None), "company") or get_default_company()
     if not company or not sales_accounts:
-        month_map = {month_no: 0.0 for month_no in range(1, 13)}
-        _MONTHLY_SALES_PL_CACHE[year_key] = month_map
-        return month_map
+        return None
 
-    latest_posting_date = frappe.db.sql(
+    return frappe.db.sql(
         """
         SELECT MAX(posting_date) AS posting_date
         FROM `tabGL Entry`
@@ -367,6 +379,21 @@ def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
         },
         as_dict=True,
     )[0].posting_date
+
+
+def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
+    year_key = str(year)
+    if year_key in _MONTHLY_SALES_PL_CACHE:
+        return _MONTHLY_SALES_PL_CACHE[year_key]
+
+    sales_accounts = set(get_sales_account_names())
+    company = frappe.db.get_value("Account", next(iter(sales_accounts), None), "company") or get_default_company()
+    if not company or not sales_accounts:
+        month_map = {month_no: 0.0 for month_no in range(1, 13)}
+        _MONTHLY_SALES_PL_CACHE[year_key] = month_map
+        return month_map
+
+    latest_posting_date = get_sales_profit_and_loss_period_end(year)
 
     if not latest_posting_date:
         month_map = {month_no: 0.0 for month_no in range(1, 13)}
@@ -613,6 +640,35 @@ def get_creditor_total(period_end: str | None = None) -> float:
         return abs(get_gl_accounts_total(creditor_accounts, period_end=period_end))
 
     return 0
+
+
+def get_cash_total(period_end: str | None = None) -> float:
+    params: dict[str, Any] = {}
+    period_filter = ""
+    if period_end:
+        params["period_end"] = period_end
+        period_filter = " AND gle.posting_date <= %(period_end)s"
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            gle.posting_date,
+            gle.company,
+            SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0)) AS balance
+        FROM `tabGL Entry` gle
+        INNER JOIN `tabAccount` acc ON acc.name = gle.account
+        WHERE gle.docstatus = 1
+          AND gle.is_cancelled = 0
+          AND acc.is_group = 0
+          AND acc.account_type = 'Cash'
+          {period_filter}
+        GROUP BY gle.posting_date, gle.company
+        """,
+        params,
+        as_dict=True,
+    )
+
+    return sum(convert_company_currency_amount(row.balance, row.posting_date, row.company) for row in rows)
 
 
 def _month_number(month: str | int | None) -> int | None:

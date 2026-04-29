@@ -10,6 +10,7 @@ from dashboards.dashboards.dashboard_data import (
     convert_company_currency_amount,
     convert_to_reporting_currency,
     format_number,
+    get_cash_total,
     get_cogs_total,
     get_creditor_total,
     get_debtor_balance_rows,
@@ -686,33 +687,29 @@ def _top_party_breakdown_rows(rows: dict[str, float], empty_label: str) -> list[
 
 
 def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
-    stock_rows, _wip_rows = _get_inventory_breakdown()
     month_no = _month_no(month) or 12
     period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
+    cash_total = get_cash_total(period_end=period_end)
     stock_total = get_stock_total(period_end=period_end)
-    debtor_rows = _get_party_balance_rows("Receivable", year, month)
-    creditor_rows = _get_party_balance_rows("Payable", year, month)
     debtor_total = get_debtor_total(period_end=period_end)
     creditor_total = get_creditor_total(period_end=period_end)
 
     items = [
         {
-            "label": "Sklad (Stock)",
+            "label": "Sklad",
             "value": _format_uzs(stock_total),
-            "details": [[ "1410 - Сырьё склад - P", _format_uzs(stock_total) ]],
-            "open": False,
         },
         {
             "label": "Qarzdor",
             "value": _format_uzs(debtor_total),
-            "details": _top_party_breakdown_rows(debtor_rows, "No debtor"),
-            "open": False,
         },
         {
             "label": "Haqdor",
             "value": _format_uzs(creditor_total),
-            "details": _top_party_breakdown_rows(creditor_rows, "No creditor"),
-            "open": True,
+        },
+        {
+            "label": "Kassa",
+            "value": _format_uzs(cash_total),
         },
     ]
 

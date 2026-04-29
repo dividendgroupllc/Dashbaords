@@ -125,13 +125,6 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			this.load_data({ year: this.state.year, month });
 		});
 
-		this.page.main.on("click.main-dashboard-static", "[data-balance-toggle]", (event) => {
-			const $item = $(event.currentTarget).closest(".mds-balance-item");
-			const isOpen = $item.hasClass("is-open");
-			$item.toggleClass("is-open", !isOpen);
-			$(event.currentTarget).attr("aria-expanded", isOpen ? "false" : "true");
-		});
-
 		$(document).off("click.main-dashboard-static-year").on("click.main-dashboard-static-year", (event) => {
 			if ($(event.target).closest(".mds-year-select").length) {
 				return;
@@ -150,25 +143,12 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		return `<button class="mds-month ${month === this.state.month ? "is-active" : ""}" type="button" data-month="${month}">${month}</button>`;
 	}
 
-	render_balance_item(label, value, details = [], open = false) {
+	render_balance_item(label, value) {
 		return `
-			<div class="mds-balance-item ${open ? "is-open" : ""}">
-				<button class="mds-balance-row" type="button" data-balance-toggle aria-expanded="${open ? "true" : "false"}">
-					<span class="mds-chevron"></span>
+			<div class="mds-balance-item">
+				<div class="mds-balance-row">
 					<span>${frappe.utils.escape_html(label)}</span>
 					<strong>${frappe.utils.escape_html(value)}</strong>
-				</button>
-				<div class="mds-balance-detail">
-					${details
-						.map(
-							([detailLabel, detailValue]) => `
-								<div class="mds-balance-sub">
-									<span>${frappe.utils.escape_html(detailLabel)}</span>
-									<strong>${frappe.utils.escape_html(detailValue)}</strong>
-								</div>
-							`
-						)
-						.join("")}
 				</div>
 			</div>
 		`;
@@ -365,7 +345,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.$balanceDetails.html(`
 			<h2>BALANCE DETAILS</h2>
 			${items
-				.map((item) => this.render_balance_item(item.label, item.value, item.details || [], Boolean(item.open)))
+				.map((item) => this.render_balance_item(item.label, item.value))
 				.join("")}
 			<div class="mds-total-balance">
 				<span>TOTAL BALANCE</span>

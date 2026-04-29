@@ -635,6 +635,7 @@
 }
 
 .mds-balance-item {
+	margin: 8px 0px;
 	border: 1px solid #e7edf6;
 	border-radius: 8px;
 	background: #f7f9fe;
@@ -643,53 +644,17 @@
 
 .mds-balance-row {
 	display: grid;
-	grid-template-columns: 18px 1fr auto;
+	grid-template-columns: 1fr auto;
 	align-items: center;
 	gap: 12px;
 	width: 100%;
 	padding: 18px;
-	border: 0;
-	background: transparent;
 	color: inherit;
-	font-family: inherit;
 	font-size: 20px;
-	text-align: left;
-	cursor: pointer;
-}
-
-.mds-balance-row .mds-chevron {
-	transform: rotate(-45deg);
-	transition: transform 0.2s ease;
-}
-
-.mds-balance-item.is-open .mds-balance-row .mds-chevron {
-	transform: rotate(45deg);
 }
 
 .mds-balance-row strong {
 	font-weight: 900;
-}
-
-.mds-balance-detail {
-	max-height: 0;
-	overflow: hidden;
-	font-size: 18px;
-	transition: max-height 0.22s ease;
-}
-
-.mds-balance-item.is-open .mds-balance-detail {
-	max-height: 180px;
-}
-
-.mds-balance-sub {
-	display: flex;
-	justify-content: space-between;
-	gap: 18px;
-	padding: 13px 18px;
-}
-
-.mds-balance-sub:first-child {
-	border-top: 1px solid #e7edf6;
 }
 
 .mds-total-balance {

@@ -190,11 +190,22 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 
 	render_table(key, rows, headers, title = null) {
 		const $slot = this.page.main.find(`[data-table="${key}"]`);
+		const columnWidths = this.getTableColumnWidths(key, headers.length);
 		$slot.html(`
 			${title ? `<div class="dashboard-page-table-title">${frappe.utils.escape_html(title)}</div>` : ""}
 			<table class="dashboard-page-table">
+				<colgroup>
+					${columnWidths.map((width) => `<col style="width:${width}">`).join("")}
+				</colgroup>
 				<thead>
-					<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
+					<tr>
+						${headers
+							.map((header, index) => {
+								const alignClass = index === 0 ? "is-text" : "is-number";
+								return `<th class="${alignClass}">${frappe.utils.escape_html(header)}</th>`;
+							})
+							.join("")}
+					</tr>
 				</thead>
 				<tbody>
 					${(rows || [])
@@ -220,6 +231,18 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 				</tbody>
 			</table>
 		`);
+	}
+
+	getTableColumnWidths(key, columnCount) {
+		const widthMap = {
+			"sales-by-month": ["48%", "52%"],
+			"returns-by-month": ["48%", "52%"],
+			"product-margin": ["48%", "32%", "20%"],
+			"client-kpi": ["34%", "16%", "32%", "18%"],
+			"regional-summary": ["34%", "22%", "26%", "18%"],
+		};
+
+		return widthMap[key] || Array.from({ length: columnCount }, () => `${100 / Math.max(columnCount, 1)}%`);
 	}
 
 	shorten_label(value, maxLength = 22) {

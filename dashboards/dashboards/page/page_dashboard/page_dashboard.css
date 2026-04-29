@@ -204,6 +204,14 @@
 	font-weight: 700;
 }
 
+.dashboard-page-table thead .is-text {
+	text-align: left;
+}
+
+.dashboard-page-table thead .is-number {
+	text-align: right;
+}
+
 .dashboard-page-table tbody td {
 	padding: 2px 4px;
 	color: #19912a;
@@ -214,12 +222,10 @@
 
 .dashboard-page-table .is-text {
 	text-align: left;
-	width: 42%;
 }
 
 .dashboard-page-table .is-number {
 	text-align: right;
-	width: 58%;
 }
 
 .dashboard-page-table tbody tr.is-total td {
