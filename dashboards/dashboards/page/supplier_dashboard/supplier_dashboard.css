@@ -81,8 +81,8 @@
 }
 
 .supplier-dashboard-filters {
-	display: grid;
-	grid-template-columns: auto minmax(160px, 220px) auto minmax(0, 1fr);
+	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 12px;
 	margin: 14px 14px 0;
@@ -98,6 +98,7 @@
 }
 
 .supplier-dashboard-filter-label {
+	flex: 0 0 auto;
 	color: #526783;
 	font-size: 13px;
 	font-weight: 800;
@@ -105,6 +106,7 @@
 }
 
 .supplier-dashboard-year-select {
+	flex: 0 0 110px;
 	position: relative;
 	width: 110px;
 }
@@ -161,9 +163,11 @@
 
 .supplier-dashboard-month-grid {
 	display: grid;
+	flex: 1 1 620px;
 	grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
 	gap: 8px;
 	width: 100%;
+	min-width: min(100%, 360px);
 }
 
 .supplier-dashboard-year-option,
@@ -340,14 +344,19 @@
 
 @media (max-width: 1280px) {
 	.supplier-dashboard-filters {
-		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
 	}
 }
 
 @media (max-width: 900px) {
 	.supplier-dashboard-filters {
-		grid-template-columns: 1fr;
 		align-items: stretch;
+	}
+
+	.supplier-dashboard-filter-label,
+	.supplier-dashboard-year-select,
+	.supplier-dashboard-month-grid {
+		flex-basis: 100%;
 	}
 
 	.supplier-dashboard-year-menu {

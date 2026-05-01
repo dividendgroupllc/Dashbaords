@@ -37,7 +37,57 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 		this.load_context();
 	}
 
+	ensure_runtime_styles() {
+		if (document.getElementById("supplier-dashboard-runtime-filter-fix")) {
+			return;
+		}
+
+		const style = document.createElement("style");
+		style.id = "supplier-dashboard-runtime-filter-fix";
+		style.textContent = `
+			.supplier-dashboard-filters {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 12px;
+				overflow: hidden;
+			}
+			.supplier-dashboard-filters > * {
+				min-width: 0;
+			}
+			.supplier-dashboard-filter-label {
+				flex: 0 0 auto;
+			}
+			.supplier-dashboard-year-select {
+				flex: 0 0 110px;
+			}
+			.supplier-dashboard-month-grid {
+				display: grid;
+				flex: 1 1 620px;
+				grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+				gap: 8px;
+				min-width: min(100%, 360px);
+				width: 100%;
+			}
+			.supplier-dashboard-month {
+				min-width: 0;
+			}
+			@media (max-width: 900px) {
+				.supplier-dashboard-filters {
+					align-items: stretch;
+				}
+				.supplier-dashboard-filter-label,
+				.supplier-dashboard-year-select,
+				.supplier-dashboard-month-grid {
+					flex-basis: 100%;
+				}
+			}
+		`;
+		document.head.appendChild(style);
+	}
+
 	make_layout() {
+		this.ensure_runtime_styles();
 		this.wrapper.find(".layout-main-section-wrapper").addClass("supplier-dashboard-layout");
 		this.wrapper.find(".page-head").addClass("supplier-dashboard-page-head");
 		this.page.main.removeClass("frappe-card");
