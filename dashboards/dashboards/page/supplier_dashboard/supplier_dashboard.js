@@ -37,62 +37,7 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 		this.load_context();
 	}
 
-	ensure_runtime_styles() {
-		if (document.getElementById("supplier-dashboard-runtime-filter-fix")) {
-			return;
-		}
-
-		const style = document.createElement("style");
-		style.id = "supplier-dashboard-runtime-filter-fix";
-		style.textContent = `
-			.supplier-dashboard-filters {
-				display: grid !important;
-				grid-template-columns: minmax(0, 1fr) !important;
-				gap: 12px !important;
-				overflow: hidden !important;
-				width: 100% !important;
-				box-sizing: border-box !important;
-			}
-			.supplier-dashboard-period-row {
-				display: flex !important;
-				align-items: center !important;
-				gap: 12px !important;
-				min-width: 0 !important;
-				width: 100% !important;
-				box-sizing: border-box !important;
-			}
-			.supplier-dashboard-filter-label {
-				flex: 0 0 auto !important;
-			}
-			.supplier-dashboard-year-select {
-				flex: 0 0 110px !important;
-			}
-			.supplier-dashboard-month-grid {
-				display: grid !important;
-				flex: 1 1 auto !important;
-				grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)) !important;
-				gap: 8px !important;
-				min-width: 0 !important;
-				width: 100% !important;
-				max-width: 100% !important;
-				box-sizing: border-box !important;
-			}
-			.supplier-dashboard-month {
-				min-width: 0 !important;
-				box-sizing: border-box !important;
-			}
-			@media (max-width: 900px) {
-				.supplier-dashboard-period-row {
-					align-items: stretch !important;
-					flex-direction: column !important;
-				}
-			}
-		`;
-		document.head.appendChild(style);
-	}
-
 	make_layout() {
-		this.ensure_runtime_styles();
 		this.wrapper.find(".layout-main-section-wrapper").addClass("supplier-dashboard-layout");
 		this.wrapper.find(".page-head").addClass("supplier-dashboard-page-head");
 		this.page.main.removeClass("frappe-card");
@@ -110,21 +55,17 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 						</div>
 						<div class="supplier-dashboard-info">i</div>
 					</header>
-					<div class="supplier-dashboard-filters" style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; overflow: hidden; width: 100%; box-sizing: border-box;">
-						<div class="supplier-dashboard-period-row supplier-dashboard-period-row--year" style="display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; box-sizing: border-box;">
-							<div class="supplier-dashboard-filter-label">ФИЛЬТР ГОДА</div>
-							<div class="supplier-dashboard-year-select">
-								<button class="supplier-dashboard-select" type="button" data-year-toggle aria-expanded="false">
-									<span data-region="selected-year">...</span>
-									<span class="supplier-dashboard-chevron"></span>
-								</button>
-								<div class="supplier-dashboard-year-menu" data-region="years"></div>
-							</div>
+					<div class="supplier-dashboard-filters">
+						<div class="supplier-dashboard-filter-label">ФИЛЬТР ГОДА</div>
+						<div class="supplier-dashboard-year-select">
+							<button class="supplier-dashboard-select" type="button" data-year-toggle aria-expanded="false">
+								<span data-region="selected-year">...</span>
+								<span class="supplier-dashboard-chevron"></span>
+							</button>
+							<div class="supplier-dashboard-year-menu" data-region="years"></div>
 						</div>
-						<div class="supplier-dashboard-period-row supplier-dashboard-period-row--months" style="display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; box-sizing: border-box;">
-							<div class="supplier-dashboard-filter-label">ФИЛЬТР МЕСЯЦА</div>
-							<div class="supplier-dashboard-month-grid" data-region="months" style="display: grid; flex: 1 1 auto; grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); gap: 8px; min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box;"></div>
-						</div>
+						<div class="supplier-dashboard-filter-label">ФИЛЬТР МЕСЯЦА</div>
+						<div class="supplier-dashboard-month-grid" data-region="months"></div>
 					</div>
 					<div class="supplier-dashboard-body">
 						<aside class="supplier-dashboard-kpis" data-region="kpis"></aside>
