@@ -9,7 +9,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.wrapper = $(wrapper);
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Main Dashboard"),
+			title: __("Главная панель"),
 			single_column: true,
 		});
 
@@ -18,19 +18,33 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			month: "",
 		};
 		this.months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		this.monthLabels = {
+			Jan: "Янв",
+			Feb: "Фев",
+			Mar: "Мар",
+			Apr: "Апр",
+			May: "Май",
+			Jun: "Июн",
+			Jul: "Июл",
+			Aug: "Авг",
+			Sep: "Сен",
+			Oct: "Окт",
+			Nov: "Ноя",
+			Dec: "Дек",
+		};
 		this.fullMonthLabels = {
-			Jan: "January",
-			Feb: "February",
-			Mar: "March",
-			Apr: "April",
-			May: "May",
-			Jun: "June",
-			Jul: "July",
-			Aug: "August",
-			Sep: "September",
-			Oct: "October",
-			Nov: "November",
-			Dec: "December",
+			Jan: "Январь",
+			Feb: "Февраль",
+			Mar: "Март",
+			Apr: "Апрель",
+			May: "Май",
+			Jun: "Июнь",
+			Jul: "Июль",
+			Aug: "Август",
+			Sep: "Сентябрь",
+			Oct: "Октябрь",
+			Nov: "Ноябрь",
+			Dec: "Декабрь",
 		};
 		this.years = [];
 		this.data = null;
@@ -49,7 +63,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			<div class="mds-screen">
 				<section class="mds-main">
 					<div class="mds-filters">
-						<div class="mds-filter-label">YEAR FILTER</div>
+						<div class="mds-filter-label">ФИЛЬТР ГОДА</div>
 						<div class="mds-year-select">
 							<button class="mds-select" type="button" data-year-toggle aria-expanded="false">
 								<span data-region="selected-year">...</span>
@@ -57,19 +71,19 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 							</button>
 							<div class="mds-year-menu" data-region="year-menu"></div>
 						</div>
-						<div class="mds-filter-label">MONTH FILTER</div>
+						<div class="mds-filter-label">ФИЛЬТР МЕСЯЦА</div>
 						<div class="mds-month-grid" data-region="month-grid"></div>
 					</div>
 					<div class="mds-content">
 						<section class="mds-card mds-card--wide mds-sales-card">
 							<div class="mds-card-head">
-								<h2>SALES VOLUME (TONS)</h2>
+								<h2>ОБЪЕМ ПРОДАЖ (ТОННЫ)</h2>
 							</div>
 							<div class="mds-bar-chart" data-region="sales-chart"></div>
 						</section>
 						<section class="mds-card mds-card--donut">
 							<div class="mds-card-head">
-								<h2>MARGIN & BONUS</h2>
+								<h2>МАРЖА И БОНУС</h2>
 							</div>
 							<div data-region="margin-bonus"></div>
 						</section>
@@ -88,15 +102,15 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 							</section>
 						</div>
 						<section class="mds-card mds-returns-card">
-							<h2>RETURNS ANALYSIS</h2>
+							<h2>АНАЛИЗ ВОЗВРАТОВ</h2>
 							<div class="mds-return-chart" data-region="return-chart"></div>
 						</section>
 						<section class="mds-card mds-profit-card">
 							<div class="mds-card-head">
-								<h2>NET PROFIT & PROFITABILITY</h2>
+								<h2>ЧИСТАЯ ПРИБЫЛЬ И РЕНТАБЕЛЬНОСТЬ</h2>
 								<div class="mds-legend mds-legend--compact">
-									<span><i class="is-blue"></i> Net Profit</span>
-									<span><i class="is-green"></i> Profitability</span>
+									<span><i class="is-blue"></i> Чистая прибыль</span>
+									<span><i class="is-green"></i> Рентабельность</span>
 								</div>
 							</div>
 							<div class="mds-profit-chart" data-region="profit-chart"></div>
@@ -160,7 +174,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 	}
 
 	render_month_button(month) {
-		return `<button class="mds-month ${month === this.state.month ? "is-active" : ""}" type="button" data-month="${month}">${month}</button>`;
+		return `<button class="mds-month ${month === this.state.month ? "is-active" : ""}" type="button" data-month="${month}">${this.monthLabels[month] || month}</button>`;
 	}
 
 	render_balance_item(label, value) {
@@ -190,12 +204,12 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			this.state.month = backendFilters.selected_month || "";
 			this.render();
 		}).catch(() => {
-			frappe.msgprint(__("Main Dashboard data could not be loaded."));
+			frappe.msgprint(__("Не удалось загрузить данные главной панели."));
 		});
 	}
 
 	show_loading() {
-		const loadingMarkup = `<div class="mds-loading">Loading...</div>`;
+		const loadingMarkup = `<div class="mds-loading">Загрузка...</div>`;
 		this.$salesChart.html(loadingMarkup);
 		this.$returnChart.html(loadingMarkup);
 		this.$profitChart.html(loadingMarkup);
@@ -250,9 +264,9 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		this.$returnChart.html(`
 			<div class="mds-return-table">
 				<div class="mds-return-table-head">
-					<span>Oy</span>
-					<span>Tonna</span>
-					<span>Summa</span>
+					<span>Месяц</span>
+					<span>Тонна</span>
+					<span>Сумма</span>
 				</div>
 				<div class="mds-return-table-body">
 					${this.months
@@ -284,7 +298,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 						${row.amount_display ? `<span class="mds-bar-amount">${frappe.utils.escape_html(row.amount_display)}</span>` : ""}
 					</div>
 				</div>
-				<span class="mds-bar-month">${frappe.utils.escape_html(month)}</span>
+				<span class="mds-bar-month">${frappe.utils.escape_html(this.monthLabels[month] || month)}</span>
 			</div>
 		`;
 	}
@@ -303,15 +317,15 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 				<div class="mds-donut" style="background: conic-gradient(var(--mds-blue) 0 ${stop1}%, var(--mds-mint) ${stop1}% ${stop2}%, var(--mds-gold) ${stop2}% ${stop3}%, var(--mds-red) ${stop3}% 100%);">
 					<div class="mds-donut-core">
 						<strong>${frappe.utils.escape_html(data.center_value || "0%")}</strong>
-						<span>${frappe.utils.escape_html(data.center_label || "Net Profit")}</span>
+						<span>${frappe.utils.escape_html(data.center_label || "Чистая прибыль")}</span>
 					</div>
 				</div>
 			</div>
 			<div class="mds-legend">
-				<span><i class="is-blue"></i> ${frappe.utils.escape_html(data.margin_display || "Margin (0%)")}</span>
-				<span><i class="is-gold"></i> ${frappe.utils.escape_html(data.marketing_display || "Marketing (0%)")}</span>
-				<span><i class="is-mint"></i> ${frappe.utils.escape_html(data.bonus_display || "Bonus (0%)")}</span>
-				<span><i class="is-red"></i> ${frappe.utils.escape_html(data.net_profit_display || "Net Profit (0%)")}</span>
+				<span><i class="is-blue"></i> ${frappe.utils.escape_html(data.margin_display || "Маржа (0%)")}</span>
+				<span><i class="is-gold"></i> ${frappe.utils.escape_html(data.marketing_display || "Маркетинг (0%)")}</span>
+				<span><i class="is-mint"></i> ${frappe.utils.escape_html(data.bonus_display || "Бонус (0%)")}</span>
+				<span><i class="is-red"></i> ${frappe.utils.escape_html(data.net_profit_display || "Чистая прибыль (0%)")}</span>
 			</div>
 		`);
 	}
@@ -344,17 +358,17 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 	render_average_check() {
 		const data = this.data?.average_check || {};
 		this.$averageCheck.html(`
-			<h2>AVERAGE CHECK</h2>
+			<h2>СРЕДНИЙ ЧЕК</h2>
 			<div class="mds-price-row">
 				<div>
-					<span>Selling Price</span>
+					<span>Цена продажи</span>
 					<strong>${frappe.utils.escape_html(data.selling_price_display || "0 UZS")}</strong>
 				</div>
 				${this.render_delta_badge(data.selling_change, data.selling_change_display)}
 			</div>
 			<div class="mds-price-row">
 				<div>
-					<span>Cost Price</span>
+					<span>Себестоимость</span>
 					<strong class="is-muted">${frappe.utils.escape_html(data.cost_price_display || "0 UZS")}</strong>
 				</div>
 				${this.render_delta_badge(data.cost_change, data.cost_change_display)}
@@ -370,11 +384,11 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			<div class="mds-health-card mds-health-card--embedded">
 				<div class="mds-health-head">
 					<div>
-						<span>Business Health</span>
+						<span>Состояние бизнеса</span>
 						<strong>${frappe.utils.escape_html(data.health_ratio_display || "0.0%")}</strong>
 					</div>
 					<em class="${healthRatio <= 30 ? "is-good" : healthRatio <= 50 ? "is-warn" : "is-risk"}">
-						Qarz / Savdo
+						Долг / Продажи
 					</em>
 				</div>
 				<div class="mds-health-bar">
@@ -389,11 +403,11 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 				</div>
 				<div class="mds-health-meta">
 					<div>
-						<span>Qarz</span>
+						<span>Долг</span>
 						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
 					</div>
 					<div>
-						<span>Savdo</span>
+						<span>Продажи</span>
 						<strong>${frappe.utils.escape_html(data.health_sales_display || "0 UZS")}</strong>
 					</div>
 				</div>
@@ -403,7 +417,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 
 	render_business_health_card() {
 		this.$businessHealth.html(`
-			<h2>BUSINESS HEALTH</h2>
+			<h2>СОСТОЯНИЕ БИЗНЕСА</h2>
 			${this.render_business_health()}
 		`);
 	}
@@ -412,12 +426,12 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		const data = this.data?.balance_details || {};
 		const items = data.items || [];
 		this.$balanceDetails.html(`
-			<h2>BALANCE DETAILS</h2>
+			<h2>ДЕТАЛИ БАЛАНСА</h2>
 			${items
 				.map((item) => this.render_balance_item(item.label, item.value))
 				.join("")}
 			<div class="mds-total-balance">
-				<span>TOTAL BALANCE</span>
+				<span>ОБЩИЙ БАЛАНС</span>
 				<strong>${frappe.utils.escape_html(data.total_balance || "0 UZS")}</strong>
 			</div>
 		`);
@@ -429,9 +443,9 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 		const currentRatio = Math.max(planRatio, Math.min(100, Number(breakEven.current_ratio || 0)));
 		const greenWidth = Math.max(currentRatio - planRatio, 0);
 		this.$unitCost.html(`
-			<h2>BREAK-EVEN</h2>
+			<h2>ТОЧКА БЕЗУБЫТОЧНОСТИ</h2>
 			<div class="mds-progress-head">
-				<span class="mds-progress-title">${frappe.utils.escape_html(breakEven.title || "Production Progress")}</span>
+				<span class="mds-progress-title">${frappe.utils.escape_html(breakEven.title || "Производственный прогресс")}</span>
 				<strong class="mds-progress-summary">${frappe.utils.escape_html(breakEven.summary || "0t / 0t")}</strong>
 			</div>
 			<div class="mds-progress" style="--mds-plan-ratio:${planRatio}%; --mds-current-ratio:${currentRatio}%; --mds-green-width:${greenWidth}%;">
@@ -443,8 +457,8 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 			</div>
 			<div class="mds-progress-scale">
 				<span class="mds-progress-badge mds-progress-badge--start">${frappe.utils.escape_html(breakEven.start_label || "0t")}</span>
-				<span class="mds-progress-badge mds-progress-badge--plan">${frappe.utils.escape_html(breakEven.plan_label || "Plan: 0t")}</span>
-				<span class="mds-progress-badge mds-progress-badge--current">${frappe.utils.escape_html(breakEven.current_label || "Current: 0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--plan">${frappe.utils.escape_html(breakEven.plan_label || "План: 0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--current">${frappe.utils.escape_html(breakEven.current_label || "Текущее: 0t")}</span>
 			</div>
 		`);
 	}
@@ -504,7 +518,7 @@ dashboards.ui.MainDashboardStaticPage = class MainDashboardStaticPage {
 											<div class="mds-profit-bar mds-profit-bar--green ${profitabilityValue ? "" : "is-zero"}" style="height:${profitabilityHeight}%; width: 10px;"></div>
 										</div>
 									</div>
-									<span class="mds-profit-month">${frappe.utils.escape_html(row.month)}</span>
+									<span class="mds-profit-month">${frappe.utils.escape_html(this.monthLabels[row.month] || row.month)}</span>
 								</div>
 							`;
 						})

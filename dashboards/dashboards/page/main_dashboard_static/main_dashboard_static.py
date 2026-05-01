@@ -474,11 +474,11 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
         "marketing_percent": marketing_percent,
         "net_profit_percent": net_profit_percent,
         "center_value": f"{int(round(net_profit_percent))}%",
-        "center_label": "Net Profit",
-        "margin_display": f"Margin ({margin_percent:g}%)",
-        "bonus_display": f"Bonus ({bonus_percent:g}%)",
-        "marketing_display": f"Marketing ({marketing_percent:g}%)",
-        "net_profit_display": f"Net Profit ({net_profit_percent:g}%)",
+        "center_label": "Чистая прибыль",
+        "margin_display": f"Маржа ({margin_percent:g}%)",
+        "bonus_display": f"Бонус ({bonus_percent:g}%)",
+        "marketing_display": f"Маркетинг ({marketing_percent:g}%)",
+        "net_profit_display": f"Чистая прибыль ({net_profit_percent:g}%)",
     }
 
 
@@ -734,19 +734,19 @@ def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
 
     items = [
         {
-            "label": "Sklad",
+            "label": "Склад",
             "value": _format_uzs(stock_total),
         },
         {
-            "label": "Qarzdor",
+            "label": "Дебитор",
             "value": _format_uzs(debtor_total),
         },
         {
-            "label": "Haqdor",
+            "label": "Кредитор",
             "value": _format_uzs(creditor_total),
         },
         {
-            "label": "Kassa",
+            "label": "Касса",
             "value": _format_uzs(cash_total),
         },
     ]
@@ -924,9 +924,10 @@ def _get_expense_total_by_root_for_period(
 
 def _get_break_even_data(year: str, month: str) -> dict[str, Any]:
     metrics = _get_break_even_metrics(year, month)
+    average_check = _get_average_check_data(year, month)
     current_tons = _to_tons(metrics["manufactured_qty"]) or _to_tons(metrics["qty_total"])
-    selling_price = _safe_div(metrics["sales_amount"], current_tons)
-    cost_price = _safe_div(metrics["cost_amount"], current_tons)
+    selling_price = flt(average_check.get("selling_price"))
+    cost_price = flt(average_check.get("cost_price"))
     contribution_per_ton = max(selling_price - cost_price, 0)
     plan_tons = _safe_div(metrics["fixed_cost_total"], contribution_per_ton) if contribution_per_ton else 0
     plan_tons = round(plan_tons, 2)
@@ -944,12 +945,12 @@ def _get_break_even_data(year: str, month: str) -> dict[str, Any]:
 
     return {
         "summary": f"{current_tons:g}t / {plan_tons:g}t",
-        "title": "Production Progress",
+        "title": "Производственный прогресс",
         "plan_ratio": plan_ratio,
         "current_ratio": current_ratio,
         "start_label": "0t",
-        "plan_label": f"Plan: {plan_tons:g}t",
-        "current_label": f"Current: {current_tons:g}t",
+        "plan_label": f"План: {plan_tons:g}t",
+        "current_label": f"Текущее: {current_tons:g}t",
         "debt_sales_label": f"{round(debt_ratio):g}% / {round(sales_ratio):g}%",
     }
 

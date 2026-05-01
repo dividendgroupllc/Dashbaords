@@ -56,6 +56,19 @@ def _normalize_filters(year: str | None, month: str | None) -> tuple[str, str]:
 	return selected_year, selected_month
 
 
+def _normalize_day(year: str, month: str, day: str | int | None) -> int | None:
+	if day in (None, ""):
+		return None
+
+	try:
+		day_no = int(day)
+	except (TypeError, ValueError):
+		return None
+
+	last_day = monthrange(int(year), MONTH_MAP[month])[1]
+	return day_no if 1 <= day_no <= last_day else None
+
+
 def _base_filter_clause(year: str, month: str, alias: str = "si") -> tuple[str, dict[str, Any]]:
 	prefix = f"{alias}." if alias else ""
 	return (
@@ -74,8 +87,18 @@ def _client_filter_clause(client: str | None, params: dict[str, Any], alias: str
 	)
 
 
-def _get_clients(year: str, month: str) -> list[str]:
+def _day_filter_clause(day: int | None, params: dict[str, Any], alias: str = "si") -> str:
+	if not day:
+		return ""
+
+	prefix = f"{alias}." if alias else ""
+	params["day"] = int(day)
+	return f" AND DAY({prefix}posting_date) = %(day)s"
+
+
+def _get_clients(year: str, month: str, day: int | None = None) -> list[str]:
 	clause, params = _base_filter_clause(year, month, alias="si")
+	day_clause = _day_filter_clause(day, params, alias="si")
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -86,6 +109,7 @@ def _get_clients(year: str, month: str) -> list[str]:
 		WHERE si.docstatus = 1
 		  AND COALESCE(si.is_return, 0) = 0
 		{clause}
+		{day_clause}
 		GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент')
 		ORDER BY sales_amount DESC, client ASC
 		""",
@@ -118,9 +142,10 @@ def _get_calendar_values(year: str, month: str, client: str | None) -> dict[int,
 	return {int(row.day_no): int(round(flt(row.total_qty))) for row in rows if row.day_no}
 
 
-def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[str, Any]]:
+def _get_product_rows(year: str, month: str, client: str | None, day: int | None = None) -> list[dict[str, Any]]:
 	clause, params = _base_filter_clause(year, month, alias="si")
 	client_clause = _client_filter_clause(client, params, alias="si")
+	day_clause = _day_filter_clause(day, params, alias="si")
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -135,6 +160,7 @@ def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[st
 		  AND COALESCE(si.is_return, 0) = 0
 		{clause}
 		{client_clause}
+		{day_clause}
 		GROUP BY COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар')
 		ORDER BY sales DESC, item ASC
 		""",
@@ -167,13 +193,19 @@ def _get_product_rows(year: str, month: str, client: str | None) -> list[dict[st
 
 
 @frappe.whitelist()
-def get_dashboard_context(year: str | None = None, month: str | None = None, client: str | None = None):
+def get_dashboard_context(
+	year: str | None = None,
+	month: str | None = None,
+	client: str | None = None,
+	day: str | int | None = None,
+):
 	selected_year, selected_month = _normalize_filters(year, month)
-	clients = _get_clients(selected_year, selected_month)
+	selected_day = _normalize_day(selected_year, selected_month, day)
+	clients = _get_clients(selected_year, selected_month, selected_day)
 	selected_client = client if client in clients else None
 
 	calendar_values = _get_calendar_values(selected_year, selected_month, selected_client)
-	product_rows = _get_product_rows(selected_year, selected_month, selected_client)
+	product_rows = _get_product_rows(selected_year, selected_month, selected_client, selected_day)
 	month_label = next((item["label"] for item in MONTHS if item["key"] == selected_month), selected_month.title())
 	total_days = monthrange(int(selected_year), MONTH_MAP[selected_month])[1]
 
@@ -184,6 +216,7 @@ def get_dashboard_context(year: str | None = None, month: str | None = None, cli
 			"year": selected_year,
 			"month": selected_month,
 			"client": selected_client,
+			"day": selected_day,
 		},
 		"years": _get_years(),
 		"months": MONTHS,
@@ -193,5 +226,6 @@ def get_dashboard_context(year: str | None = None, month: str | None = None, cli
 		"calendar_meta": {
 			"label": f"{month_label} {selected_year}",
 			"days_in_month": total_days,
+			"selected_day": selected_day,
 		},
 	}

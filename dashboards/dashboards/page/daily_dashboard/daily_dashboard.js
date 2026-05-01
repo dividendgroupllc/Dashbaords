@@ -17,7 +17,9 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			year: null,
 			month: null,
 			client: null,
+			day: null,
 		};
+		this.clientListHeight = null;
 
 		this.make_layout();
 		this.bind_events();
@@ -89,6 +91,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 				year: filters.year || this.state.year,
 				month: filters.month || this.state.month,
 				client: Object.prototype.hasOwnProperty.call(filters, "client") ? filters.client : this.state.client,
+				day: Object.prototype.hasOwnProperty.call(filters, "day") ? filters.day : this.state.day,
 			},
 			callback: (r) => {
 				this.context = r.message || {};
@@ -127,6 +130,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			this.load_context({
 				year: String($(e.currentTarget).data("year")),
 				client: null,
+				day: null,
 			});
 		});
 	}
@@ -149,6 +153,7 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			this.load_context({
 				month: String($(e.currentTarget).data("month")),
 				client: null,
+				day: null,
 			});
 		});
 	}
@@ -168,6 +173,13 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 				)
 				.join("")
 		);
+
+		if (!this.clientListHeight) {
+			this.clientListHeight = Math.ceil(this.$clients.outerHeight() || 0);
+		}
+		if (this.clientListHeight) {
+			this.$clients.css("height", `${this.clientListHeight}px`);
+		}
 
 		this.$clients.find("[data-client]").on("click", (e) => {
 			const client = String($(e.currentTarget).data("client"));
@@ -192,10 +204,14 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		for (let day = 1; day <= lastDay; day += 1) {
 			const value = values[day] || null;
 			cells.push(`
-				<div class="daily-dashboard-calendar-cell ${value ? this.getHeatClass(value, values) : "is-blank"} ${day === date.getDate() ? "is-current-day" : ""}">
+				<button
+					type="button"
+					class="daily-dashboard-calendar-cell ${value ? this.getHeatClass(value, values) : "is-blank"} ${day === date.getDate() ? "is-current-day" : ""} ${day === this.state.day ? "is-active" : ""}"
+					data-day="${day}"
+				>
 					<div class="daily-dashboard-calendar-day">${day}</div>
 					<div class="daily-dashboard-calendar-value">${value ? this.formatInteger(value) : ""}</div>
-				</div>
+				</button>
 			`);
 		}
 
@@ -206,6 +222,12 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 				.join("")
 		);
 		this.$calendar.html(cells.join(""));
+		this.$calendar.find("[data-day]").on("click", (e) => {
+			const day = Number($(e.currentTarget).data("day")) || null;
+			this.load_context({
+				day: day === this.state.day ? null : day,
+			});
+		});
 	}
 
 	render_table() {

@@ -20,12 +20,7 @@ _TARGET_DEBTOR_ACCOUNT = "1311 - Debtors UZS - P"
 _TARGET_STOCK_ACCOUNT = "1410 - Сырьё склад - P"
 _TARGET_SALES_ACCOUNT = "4110 - Sales - P"
 _TARGET_COGS_ACCOUNT = "5111 - Cost of Goods Sold - P"
-_TARGET_FIXED_COST_ACCOUNTS = [
-    ("5203 - Хозяйственный - P", "5203"),
-    ("5209 - Зарп.адм - P", "5209"),
-    ("5210 - Аренда - P", "5210"),
-    ("5213 - Salary - P", "5213"),
-]
+_TARGET_FIXED_COST_ROOT_ACCOUNT_NUMBER = "5200"
 _TARGET_CASH_ACCOUNTS = [
     ("1110 - Наличные UZB - P", "1110"),
     ("1111 - Р/С UZB - P", "1111"),
@@ -221,16 +216,35 @@ def get_fixed_cost_account_names() -> list[str]:
         "root_type": "Expense",
         "report_type": "Profit and Loss",
         "disabled": 0,
-        "is_group": 0,
     }
-    fixed_cost_accounts: list[str] = []
+    root_account = frappe.db.get_value(
+        "Account",
+        {**account_filters, "account_number": _TARGET_FIXED_COST_ROOT_ACCOUNT_NUMBER},
+        ["lft", "rgt"],
+        as_dict=True,
+    )
 
-    for account_name, account_number in _TARGET_FIXED_COST_ACCOUNTS:
-        resolved_name = frappe.db.get_value("Account", {**account_filters, "name": account_name}, "name")
-        if not resolved_name and account_number:
-            resolved_name = frappe.db.get_value("Account", {**account_filters, "account_number": account_number}, "name")
-        if resolved_name:
-            fixed_cost_accounts.append(str(resolved_name))
+    if root_account:
+        fixed_cost_accounts = frappe.get_all(
+            "Account",
+            filters={
+                **account_filters,
+                "is_group": 0,
+                "lft": (">=", root_account.lft),
+                "rgt": ("<=", root_account.rgt),
+            },
+            pluck="name",
+        )
+    else:
+        fixed_cost_accounts = frappe.get_all(
+            "Account",
+            filters={
+                **account_filters,
+                "is_group": 0,
+                "account_number": ("like", f"{_TARGET_FIXED_COST_ROOT_ACCOUNT_NUMBER}%"),
+            },
+            pluck="name",
+        )
 
     return list(dict.fromkeys(fixed_cost_accounts))
 

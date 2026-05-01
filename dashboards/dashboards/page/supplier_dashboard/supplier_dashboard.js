@@ -12,8 +12,28 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 			title: __("Панель поставщиков"),
 			single_column: true,
 		});
+		this.state = {
+			year: null,
+			month: null,
+			supplier: null,
+		};
+		this.monthLabels = {
+			Январь: "Янв",
+			Февраль: "Фев",
+			Март: "Мар",
+			Апрель: "Апр",
+			Май: "Май",
+			Июнь: "Июн",
+			Июль: "Июл",
+			Август: "Авг",
+			Сентябрь: "Сен",
+			Октябрь: "Окт",
+			Ноябрь: "Ноя",
+			Декабрь: "Дек",
+		};
 
 		this.make_layout();
+		this.bind_events();
 		this.load_context();
 	}
 
@@ -35,6 +55,18 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 						</div>
 						<div class="supplier-dashboard-info">i</div>
 					</header>
+					<div class="supplier-dashboard-filters">
+						<div class="supplier-dashboard-filter-label">ФИЛЬТР ГОДА</div>
+						<div class="supplier-dashboard-year-select">
+							<button class="supplier-dashboard-select" type="button" data-year-toggle aria-expanded="false">
+								<span data-region="selected-year">...</span>
+								<span class="supplier-dashboard-chevron"></span>
+							</button>
+							<div class="supplier-dashboard-year-menu" data-region="years"></div>
+						</div>
+						<div class="supplier-dashboard-filter-label">ФИЛЬТР МЕСЯЦА</div>
+						<div class="supplier-dashboard-month-grid" data-region="months"></div>
+					</div>
 					<div class="supplier-dashboard-body">
 						<aside class="supplier-dashboard-kpis" data-region="kpis"></aside>
 						<section class="supplier-dashboard-table-panel">
@@ -54,17 +86,46 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 		this.$company = this.page.main.find('[data-region="company"]');
 		this.$logo = this.page.main.find('[data-region="logo"]');
 		this.$period = this.page.main.find('[data-region="period"]');
+		this.$selectedYear = this.page.main.find('[data-region="selected-year"]');
+		this.$years = this.page.main.find('[data-region="years"]');
+		this.$months = this.page.main.find('[data-region="months"]');
+		this.$yearSelect = this.page.main.find(".supplier-dashboard-year-select");
 		this.$kpis = this.page.main.find('[data-region="kpis"]');
 		this.$table = this.page.main.find('[data-region="table"]');
 	}
 
-	load_context() {
+	bind_events() {
+		this.page.main.on("click", "[data-year-toggle]", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const isOpen = this.$yearSelect.hasClass("is-open");
+			this.$yearSelect.toggleClass("is-open", !isOpen);
+			$(e.currentTarget).attr("aria-expanded", String(!isOpen));
+		});
+
+		$(document)
+			.off("click.supplier-dashboard-year-menu")
+			.on("click.supplier-dashboard-year-menu", (e) => {
+				if (!$(e.target).closest(".supplier-dashboard-year-select").length) {
+					this.$yearSelect.removeClass("is-open");
+					this.page.main.find("[data-year-toggle]").attr("aria-expanded", "false");
+				}
+			});
+	}
+
+	load_context(filters = {}) {
 		this.render_loading();
 
 		frappe.call({
 			method: "dashboards.dashboards.page.supplier_dashboard.supplier_dashboard.get_dashboard_context",
+			args: {
+				year: Object.prototype.hasOwnProperty.call(filters, "year") ? filters.year : this.state.year,
+				month: Object.prototype.hasOwnProperty.call(filters, "month") ? filters.month : this.state.month,
+				supplier: Object.prototype.hasOwnProperty.call(filters, "supplier") ? filters.supplier : this.state.supplier,
+			},
 			callback: (r) => {
 				this.context = r.message || {};
+				this.state = { ...(this.context.default_filters || {}) };
 				this.render();
 			},
 		});
@@ -74,9 +135,57 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 		const companyName = this.context.company_name || __("Компания");
 		this.$company.text(companyName);
 		this.$logo.text((companyName || "S").trim().slice(0, 1).toUpperCase());
-		this.$period.text(`Период: ${this.context.period_label || ""}`);
+		const selectedSupplierName = this.context.selected_supplier_name;
+		this.$period.text(
+			selectedSupplierName ? `Период: ${this.context.period_label || ""} • Поставщик: ${selectedSupplierName}` : `Период: ${this.context.period_label || ""}`
+		);
+		this.render_filters();
 		this.render_kpis();
 		this.render_table();
+	}
+
+	render_filters() {
+		this.$selectedYear.text(this.state.year || "...");
+		this.$years.html(
+			(this.context.years || [])
+				.map(
+					(year) => `
+						<button class="supplier-dashboard-year-option ${year === this.state.year ? "is-active" : ""}" data-year="${year}">
+							${frappe.utils.escape_html(year)}
+						</button>
+					`
+				)
+				.join("")
+		);
+
+		this.$months.html(
+			(this.context.months || [])
+				.map(
+					(month) => `
+						<button class="supplier-dashboard-month ${month === this.state.month ? "is-active" : ""}" data-month="${month}">
+							${frappe.utils.escape_html(this.monthLabels[month] || month)}
+						</button>
+					`
+				)
+				.join("")
+		);
+
+		this.$years.find("[data-year]").on("click", (e) => {
+			this.$yearSelect.removeClass("is-open");
+			this.page.main.find("[data-year-toggle]").attr("aria-expanded", "false");
+			this.load_context({
+				year: String($(e.currentTarget).data("year")),
+				supplier: null,
+			});
+		});
+
+		this.$months.find("[data-month]").on("click", (e) => {
+			const month = String($(e.currentTarget).data("month"));
+			this.load_context({
+				month: month === this.state.month ? null : month,
+				supplier: null,
+			});
+		});
 	}
 
 	render_kpis() {
@@ -128,7 +237,15 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 						.map(
 							(row) => `
 								<tr>
-									<td class="is-text">${frappe.utils.escape_html(row.supplier_name || "")}</td>
+									<td class="is-text">
+										<button
+											type="button"
+											class="supplier-dashboard-supplier-link ${row.supplier === this.state.supplier ? "is-active" : ""}"
+											data-supplier="${frappe.utils.escape_html(row.supplier || "")}"
+										>
+											${frappe.utils.escape_html(row.supplier_name || "")}
+										</button>
+									</td>
 									<td>${this.formatNumber(row.opening)}</td>
 									<td>${this.formatNumber(row.inflow)}</td>
 									<td>${this.formatNumber(row.cash_payment)}</td>
@@ -153,6 +270,13 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 				</tfoot>
 			</table>
 		`);
+
+		this.$table.find("[data-supplier]").on("click", (e) => {
+			const supplier = String($(e.currentTarget).data("supplier") || "");
+			this.load_context({
+				supplier: supplier === this.state.supplier ? null : supplier,
+			});
+		});
 	}
 
 	formatNumber(value) {
