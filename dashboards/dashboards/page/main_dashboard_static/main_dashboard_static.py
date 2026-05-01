@@ -928,8 +928,9 @@ def _get_break_even_data(year: str, month: str) -> dict[str, Any]:
     current_tons = _to_tons(metrics["manufactured_qty"]) or _to_tons(metrics["qty_total"])
     selling_price = flt(average_check.get("selling_price"))
     cost_price = flt(average_check.get("cost_price"))
-    contribution_per_ton = max(selling_price - cost_price, 0)
-    plan_tons = _safe_div(metrics["fixed_cost_total"], contribution_per_ton) if contribution_per_ton else 0
+    contribution_per_kg = max(selling_price - cost_price, 0)
+    plan_kg = _safe_div(metrics["fixed_cost_total"], contribution_per_kg) if contribution_per_kg else 0
+    plan_tons = _to_tons(plan_kg)
     plan_tons = round(plan_tons, 2)
     current_tons = round(current_tons, 2)
     max_tons = max(plan_tons, current_tons, 1)
