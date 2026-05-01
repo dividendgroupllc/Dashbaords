@@ -46,13 +46,15 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 		style.id = "supplier-dashboard-runtime-filter-fix";
 		style.textContent = `
 			.supplier-dashboard-filters {
-				display: flex;
-				flex-wrap: wrap;
-				align-items: center;
+				display: grid;
+				grid-template-columns: 1fr;
 				gap: 12px;
 				overflow: hidden;
 			}
-			.supplier-dashboard-filters > * {
+			.supplier-dashboard-period-row {
+				display: flex;
+				align-items: center;
+				gap: 12px;
 				min-width: 0;
 			}
 			.supplier-dashboard-filter-label {
@@ -63,23 +65,19 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 			}
 			.supplier-dashboard-month-grid {
 				display: grid;
-				flex: 1 1 620px;
-				grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+				flex: 1 1 auto;
+				grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
 				gap: 8px;
-				min-width: min(100%, 360px);
+				min-width: 0;
 				width: 100%;
 			}
 			.supplier-dashboard-month {
 				min-width: 0;
 			}
 			@media (max-width: 900px) {
-				.supplier-dashboard-filters {
+				.supplier-dashboard-period-row {
 					align-items: stretch;
-				}
-				.supplier-dashboard-filter-label,
-				.supplier-dashboard-year-select,
-				.supplier-dashboard-month-grid {
-					flex-basis: 100%;
+					flex-direction: column;
 				}
 			}
 		`;
@@ -106,16 +104,20 @@ dashboards.ui.SupplierDashboardPage = class SupplierDashboardPage {
 						<div class="supplier-dashboard-info">i</div>
 					</header>
 					<div class="supplier-dashboard-filters">
-						<div class="supplier-dashboard-filter-label">ФИЛЬТР ГОДА</div>
-						<div class="supplier-dashboard-year-select">
-							<button class="supplier-dashboard-select" type="button" data-year-toggle aria-expanded="false">
-								<span data-region="selected-year">...</span>
-								<span class="supplier-dashboard-chevron"></span>
-							</button>
-							<div class="supplier-dashboard-year-menu" data-region="years"></div>
+						<div class="supplier-dashboard-period-row supplier-dashboard-period-row--year">
+							<div class="supplier-dashboard-filter-label">ФИЛЬТР ГОДА</div>
+							<div class="supplier-dashboard-year-select">
+								<button class="supplier-dashboard-select" type="button" data-year-toggle aria-expanded="false">
+									<span data-region="selected-year">...</span>
+									<span class="supplier-dashboard-chevron"></span>
+								</button>
+								<div class="supplier-dashboard-year-menu" data-region="years"></div>
+							</div>
 						</div>
-						<div class="supplier-dashboard-filter-label">ФИЛЬТР МЕСЯЦА</div>
-						<div class="supplier-dashboard-month-grid" data-region="months"></div>
+						<div class="supplier-dashboard-period-row supplier-dashboard-period-row--months">
+							<div class="supplier-dashboard-filter-label">ФИЛЬТР МЕСЯЦА</div>
+							<div class="supplier-dashboard-month-grid" data-region="months"></div>
+						</div>
 					</div>
 					<div class="supplier-dashboard-body">
 						<aside class="supplier-dashboard-kpis" data-region="kpis"></aside>

@@ -81,9 +81,8 @@
 }
 
 .supplier-dashboard-filters {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
+	display: grid;
+	grid-template-columns: 1fr;
 	gap: 12px;
 	margin: 14px 14px 0;
 	padding: 16px;
@@ -93,7 +92,10 @@
 	box-shadow: 0 10px 28px rgba(31, 48, 82, 0.06);
 }
 
-.supplier-dashboard-filters > * {
+.supplier-dashboard-period-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 	min-width: 0;
 }
 
@@ -163,11 +165,11 @@
 
 .supplier-dashboard-month-grid {
 	display: grid;
-	flex: 1 1 620px;
-	grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+	flex: 1 1 auto;
+	grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
 	gap: 8px;
 	width: 100%;
-	min-width: min(100%, 360px);
+	min-width: 0;
 }
 
 .supplier-dashboard-year-option,
@@ -344,19 +346,14 @@
 
 @media (max-width: 1280px) {
 	.supplier-dashboard-filters {
-		align-items: center;
+		gap: 12px;
 	}
 }
 
 @media (max-width: 900px) {
-	.supplier-dashboard-filters {
+	.supplier-dashboard-period-row {
 		align-items: stretch;
-	}
-
-	.supplier-dashboard-filter-label,
-	.supplier-dashboard-year-select,
-	.supplier-dashboard-month-grid {
-		flex-basis: 100%;
+		flex-direction: column;
 	}
 
 	.supplier-dashboard-year-menu {
