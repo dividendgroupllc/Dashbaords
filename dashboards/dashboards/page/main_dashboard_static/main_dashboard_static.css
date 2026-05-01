@@ -37,15 +37,22 @@
 
 .mds-filters {
 	display: grid;
-	grid-template-columns: auto minmax(160px, 220px) auto minmax(0, 1fr);
+	grid-template-columns: auto 110px auto minmax(0, 1fr);
 	align-items: center;
 	gap: 12px;
+	max-width: 100%;
 	margin-bottom: 24px;
 	padding: 16px;
 	border: 1px solid #e6edf6;
 	border-radius: 14px;
 	background: rgba(255, 255, 255, 0.94);
 	box-shadow: 0 10px 28px rgba(31, 48, 82, 0.06);
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+.mds-filters > * {
+	min-width: 0;
 }
 
 .mds-filter-label {
@@ -112,18 +119,22 @@
 
 .mds-month-grid {
 	display: grid;
-	grid-template-columns: repeat(12, minmax(48px, 1fr));
+	grid-template-columns: repeat(12, minmax(0, 1fr));
 	gap: 8px;
+	min-width: 0;
+	max-width: 100%;
 }
 
 .mds-year-option,
 .mds-month {
-	padding: 10px;
+	min-width: 0;
+	padding: 10px 6px;
 	border: 1px solid #e2e9f3;
 	border-radius: 6px;
 	background: #f8fbff;
 	color: #2e425d;
 	font-size: 15px;
+	white-space: nowrap;
 }
 
 .mds-year-option.is-active,
