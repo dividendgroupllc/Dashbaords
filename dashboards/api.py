@@ -4,10 +4,8 @@ import frappe
 
 
 DEFAULT_ROUTE_ORDER = [
-    "main-dashboard-static",
     "main-dashboard",
     "page-dashboard",
-    "kpi-dashboard",
     "daily-dashboard",
     "sales-dashboard",
     "cash-dashboard",
@@ -22,6 +20,7 @@ DEFAULT_ROUTE_ORDER = [
     "customer-comparison",
     "product-by-customer",
 ]
+HIDDEN_ROUTES = {"main-dashboard-static", "kpi-dashboard"}
 
 
 @frappe.whitelist()
@@ -45,4 +44,5 @@ def get_dashboard_sidebar_items() -> list[dict[str, str]]:
             "route": str(page.name),
         }
         for page in pages
+        if page.name not in HIDDEN_ROUTES
     ]

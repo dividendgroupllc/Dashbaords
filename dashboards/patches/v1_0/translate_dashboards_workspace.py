@@ -11,7 +11,6 @@ HEADER_LABEL = "Все дашборды"
 
 SHORTCUT_LABELS_BY_URL = {
     "/app/main-dashboard": "Главный дашборд",
-    "/app/kpi-dashboard": "Дашборд KPI",
     "/app/monthly-analysis": "Ежемесячный анализ",
     "/app/overview-dashboard": "Обзорный дашборд",
     "/app/dividend-analysis": "Анализ дивидендов",
@@ -78,7 +77,6 @@ def update_workspace_shortcuts(workspace):
 def get_label_for_shortcut_name(shortcut_name):
     labels_by_english_name = {
         "Main Dashboard": SHORTCUT_LABELS_BY_URL["/app/main-dashboard"],
-        "KPI Dashboard": SHORTCUT_LABELS_BY_URL["/app/kpi-dashboard"],
         "Monthly Analysis": SHORTCUT_LABELS_BY_URL["/app/monthly-analysis"],
         "Overview Dashboard": SHORTCUT_LABELS_BY_URL["/app/overview-dashboard"],
         "Dividend Analysis": SHORTCUT_LABELS_BY_URL["/app/dividend-analysis"],

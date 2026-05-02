@@ -12,7 +12,6 @@ from dashboards.dashboards.dashboard_data import MONTH_LABELS
 TAB_ITEMS = [
     {"label": "ГЛАВНЫЙ", "route": "/app/main-dashboard"},
     {"label": "ПАНЕЛЬ", "route": "/app/page-dashboard"},
-    {"label": "КПЭ", "route": "/app/kpi-dashboard"},
     {"label": "ПРОДАЖА", "route": "/app/sales-dashboard"},
     {"label": "КЛИЕНТ", "route": "/app/client-dashboard"},
     {"label": "СРАВНЕНИЕ КЛИЕНТОВ", "route": "/app/customer-comparison", "active": 1},

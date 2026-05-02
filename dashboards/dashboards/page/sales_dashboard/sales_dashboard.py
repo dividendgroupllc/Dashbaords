@@ -5,7 +5,12 @@ from typing import Any
 import frappe
 from frappe.utils import flt, getdate, today
 
-from dashboards.dashboards.dashboard_data import MONTH_LABELS, get_item_cogs_map, get_item_rcp_map
+from dashboards.dashboards.dashboard_data import (
+	MONTH_LABELS,
+	convert_to_reporting_currency,
+	get_item_cogs_map,
+	get_item_rcp_map,
+)
 
 
 MONTHS = [{"key": label.lower(), "label": label} for label in MONTH_LABELS]
@@ -63,8 +68,11 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 		SELECT
 			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
 			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар') AS item,
+			si.posting_date,
+			si.currency,
+			si.company,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
-			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales,
+			SUM(COALESCE(sii.net_amount, sii.amount, sii.base_net_amount, sii.base_amount, 0)) AS sales,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost,
 			0 AS rsp
 		FROM `tabSales Invoice` si
@@ -75,24 +83,44 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 		  AND MONTH(si.posting_date) = %(month)s
 		GROUP BY
 			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар'),
-			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар')
+			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар'),
+			si.posting_date,
+			si.currency,
+			si.company
 		ORDER BY sales DESC, item ASC
 		""",
 		{"year": int(year), "month": int(MONTH_MAP[month])},
 		as_dict=True,
 	)
 
-	result = []
+	grouped: dict[str, dict[str, Any]] = {}
 	for row in rows:
-		sales = flt(row.sales)
-		cost = flt(row.cost) or flt(cogs_map.get(row.item_key))
+		sales = convert_to_reporting_currency(row.sales, row.currency, row.posting_date, row.company)
+		existing = grouped.setdefault(
+			row.item_key,
+			{
+				"item_key": row.item_key,
+				"item": row.item,
+				"kg": 0.0,
+				"sales": 0.0,
+				"cost": 0.0,
+			},
+		)
+		existing["kg"] += flt(row.kg)
+		existing["sales"] += sales
+		existing["cost"] += flt(row.cost)
+
+	result = []
+	for row in sorted(grouped.values(), key=lambda value: flt(value["sales"]), reverse=True):
+		sales = flt(row["sales"])
+		cost = flt(row["cost"]) or flt(cogs_map.get(row["item_key"]))
 		margin = sales - cost
-		rsp = flt(rcp_map.get(row.item_key))
+		rsp = flt(rcp_map.get(row["item_key"]))
 		profit = margin - rsp
 		result.append(
 			{
-				"item": row.item,
-				"kg": round(flt(row.kg)),
+				"item": row["item"],
+				"kg": round(flt(row["kg"])),
 				"sales": round(sales),
 				"cost": round(cost),
 				"margin": round(margin),

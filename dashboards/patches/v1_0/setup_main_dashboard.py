@@ -38,26 +38,13 @@ MAIN_CHARTS = [
 ]
 
 DASHBOARD_NUMBER_CARDS = [
-    ("Dashboard KPI Sales Total", "dashboards.dashboards.page.page_dashboard.data.get_sales_total", "#16a327"),
-    ("Dashboard KPI Cost Total", "dashboards.dashboards.page.page_dashboard.data.get_cost_total", "#16a327"),
-    ("Dashboard KPI Margin Total", "dashboards.dashboards.page.page_dashboard.data.get_margin_total", "#16a327"),
-    ("Dashboard KPI RSP Total", "dashboards.dashboards.page.page_dashboard.data.get_rsp_total", "#16a327"),
-    ("Dashboard KPI Return Total", "dashboards.dashboards.page.page_dashboard.data.get_return_total", "#16a327"),
-    ("Dashboard KPI Kg Total", "dashboards.dashboards.page.page_dashboard.data.get_kg_total", "#16a327"),
-    ("Dashboard KPI Avg Check", "dashboards.dashboards.page.page_dashboard.data.get_avg_check", "#16a327"),
-]
-
-KPI_NUMBER_CARDS = [
-    ("KPI Dashboard Sales Total", "dashboards.dashboards.page.kpi_dashboard.data.get_sales_total", "#118b39"),
-    ("KPI Dashboard Margin Total", "dashboards.dashboards.page.kpi_dashboard.data.get_margin_total", "#118b39"),
-    (
-        "KPI Dashboard Margin Minus Discount",
-        "dashboards.dashboards.page.kpi_dashboard.data.get_margin_minus_discount",
-        "#118b39",
-    ),
-    ("KPI Dashboard Returns Total", "dashboards.dashboards.page.kpi_dashboard.data.get_returns_total", "#118b39"),
-    ("KPI Dashboard Bonus Total", "dashboards.dashboards.page.kpi_dashboard.data.get_bonus_total", "#118b39"),
-    ("KPI Dashboard Discount Total", "dashboards.dashboards.page.kpi_dashboard.data.get_discount_total", "#118b39"),
+    ("Dashboard Sales Total", "dashboards.dashboards.page.page_dashboard.data.get_sales_total", "#16a327"),
+    ("Dashboard Cost Total", "dashboards.dashboards.page.page_dashboard.data.get_cost_total", "#16a327"),
+    ("Dashboard Margin Total", "dashboards.dashboards.page.page_dashboard.data.get_margin_total", "#16a327"),
+    ("Dashboard RSP Total", "dashboards.dashboards.page.page_dashboard.data.get_rsp_total", "#16a327"),
+    ("Dashboard Return Total", "dashboards.dashboards.page.page_dashboard.data.get_return_total", "#16a327"),
+    ("Dashboard Kg Total", "dashboards.dashboards.page.page_dashboard.data.get_kg_total", "#16a327"),
+    ("Dashboard Avg Check", "dashboards.dashboards.page.page_dashboard.data.get_avg_check", "#16a327"),
 ]
 
 DASHBOARD_CHART_SOURCES = [
@@ -123,7 +110,7 @@ def execute():
             child_tables={"roles"},
         )
 
-    for card_name, method, color in MAIN_NUMBER_CARDS + DASHBOARD_NUMBER_CARDS + KPI_NUMBER_CARDS:
+    for card_name, method, color in MAIN_NUMBER_CARDS + DASHBOARD_NUMBER_CARDS:
         upsert_doc(
             "Number Card",
             card_name,

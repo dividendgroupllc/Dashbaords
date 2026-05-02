@@ -6,7 +6,12 @@ from typing import Any
 import frappe
 from frappe.utils import flt, getdate, today
 
-from dashboards.dashboards.dashboard_data import MONTH_LABELS
+from dashboards.dashboards.dashboard_data import (
+	MONTH_LABELS,
+	convert_company_currency_amount,
+	convert_to_reporting_currency,
+	get_cogs_total,
+)
 
 
 MONTHS = [{"key": label.lower(), "label": label} for label in MONTH_LABELS]
@@ -142,6 +147,45 @@ def _get_calendar_values(year: str, month: str, client: str | None) -> dict[int,
 	return {int(row.day_no): int(round(flt(row.total_qty))) for row in rows if row.day_no}
 
 
+def _get_filtered_item_cogs_map(year: str, month: str, client: str | None, day: int | None = None) -> dict[str, float]:
+	clause, params = _base_filter_clause(year, month, alias="si")
+	client_clause = _client_filter_clause(client, params, alias="si")
+	day_clause = _day_filter_clause(day, params, alias="si")
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
+			sle.posting_date,
+			sle.company,
+			SUM(ABS(COALESCE(sle.stock_value_difference, 0))) AS cost
+		FROM `tabStock Ledger Entry` sle
+		INNER JOIN `tabSales Invoice Item` sii ON sii.name = sle.voucher_detail_no
+		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+		WHERE sle.is_cancelled = 0
+		  AND sle.voucher_type = 'Sales Invoice'
+		  AND COALESCE(sle.actual_qty, 0) < 0
+		  AND si.docstatus = 1
+		  AND COALESCE(si.is_return, 0) = 0
+		  {clause}
+		  {client_clause}
+		  {day_clause}
+		GROUP BY
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар'),
+			sle.posting_date,
+			sle.company
+		""",
+		params,
+		as_dict=True,
+	)
+
+	result: dict[str, float] = {}
+	for row in rows:
+		result[row.item_key] = result.get(row.item_key, 0) + convert_company_currency_amount(
+			row.cost, row.posting_date, row.company
+		)
+	return result
+
+
 def _get_product_rows(year: str, month: str, client: str | None, day: int | None = None) -> list[dict[str, Any]]:
 	clause, params = _base_filter_clause(year, month, alias="si")
 	client_clause = _client_filter_clause(client, params, alias="si")
@@ -149,9 +193,13 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 	rows = frappe.db.sql(
 		f"""
 		SELECT
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
 			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар') AS item,
+			si.posting_date,
+			si.currency,
+			si.company,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
-			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales,
+			SUM(COALESCE(sii.net_amount, sii.amount, sii.base_net_amount, sii.base_amount, 0)) AS sales,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost,
 			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS rsp
 		FROM `tabSales Invoice` si
@@ -161,24 +209,58 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 		{clause}
 		{client_clause}
 		{day_clause}
-		GROUP BY COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар')
+		GROUP BY
+			COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар'),
+			COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар'),
+			si.posting_date,
+			si.currency,
+			si.company
 		ORDER BY sales DESC, item ASC
 		""",
 		params,
 		as_dict=True,
 	)
 
-	result = []
+	grouped: dict[str, dict[str, Any]] = {}
 	for row in rows:
-		sales = flt(row.sales)
-		cost = flt(row.cost)
+		sales = convert_to_reporting_currency(row.sales, row.currency, row.posting_date, row.company)
+		existing = grouped.setdefault(
+			row.item_key,
+			{
+				"item_key": row.item_key,
+				"item": row.item,
+				"kg": 0.0,
+				"sales": 0.0,
+				"cost": 0.0,
+				"rsp": 0.0,
+			},
+		)
+		existing["kg"] += flt(row.kg)
+		existing["sales"] += sales
+		existing["cost"] += flt(row.cost)
+		existing["rsp"] += flt(row.rsp)
+
+	values = sorted(grouped.values(), key=lambda row: flt(row["sales"]), reverse=True)
+	total_sales = sum(flt(row["sales"]) for row in values)
+	total_cost = sum(flt(row["cost"]) for row in values)
+	item_cogs_map = _get_filtered_item_cogs_map(year, month, client, day) if not total_cost else {}
+	period_cogs_total = flt(get_cogs_total(year, MONTH_MAP[month])) if not total_cost and total_sales and not client and not day else 0
+
+	result = []
+	for row in values:
+		sales = flt(row["sales"])
+		cost = flt(row["cost"])
+		if not cost:
+			cost = flt(item_cogs_map.get(row["item_key"]))
+		if not cost and period_cogs_total:
+			cost = period_cogs_total * sales / total_sales
 		margin = sales - cost
-		rsp = flt(row.rsp)
+		rsp = flt(row["rsp"])
 		np = margin - rsp
 		result.append(
 			{
-				"item": row.item,
-				"kg": round(flt(row.kg)),
+				"item": row["item"],
+				"kg": round(flt(row["kg"])),
 				"sales": round(sales),
 				"cost": round(cost),
 				"margin": round(margin),

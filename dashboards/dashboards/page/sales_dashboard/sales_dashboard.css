@@ -117,9 +117,9 @@
 }
 
 .sales-dashboard-table-panel {
-	width: min(100%, 740px);
+	width: min(100%, 980px);
 	margin: 0;
-	transform: translateX(450px);
+	transform: translateX(260px);
 	border: 1px solid rgba(102, 151, 94, 0.66);
 	border-radius: 10px;
 	background: linear-gradient(180deg, rgba(223, 252, 194, 0.72) 0%, rgba(206, 246, 172, 0.8) 100%);
@@ -139,10 +139,11 @@
 }
 
 .sales-dashboard-table {
-	width: 100%;
+	width: max-content;
+	min-width: 980px;
 	border-collapse: collapse;
-	table-layout: fixed;
-	font-size: 11px;
+	table-layout: auto;
+	font-size: 12px;
 }
 
 .sales-dashboard-table th,
@@ -168,11 +169,12 @@
 }
 
 .sales-dashboard-table .is-text {
-	width: 34%;
+	min-width: 280px;
 	text-align: left;
 }
 
 .sales-dashboard-table .is-number {
+	min-width: 112px;
 	text-align: right;
 }
 

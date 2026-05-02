@@ -9,58 +9,114 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.wrapper = $(wrapper);
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Главный дашборд"),
+			title: __("Главная панель"),
 			single_column: true,
 		});
 
-		this.widget_names = {
-			main_chart: "Main Dashboard Timeline",
-			mini_chart: "Main Dashboard Monthly Snapshot",
-			sales_amount: "Main Dashboard Sales Amount",
-			sales_kg: "Main Dashboard Sales Kg",
-			cash_total: "Main Dashboard Cash Total",
-			bank_total: "Main Dashboard Bank Total",
-			collections_total: "Main Dashboard Collections",
-			debtor_total: "Main Dashboard Debtor Total",
-			avg_price: "Main Dashboard Average Price",
-			avg_cost: "Main Dashboard Average Cost",
-			dividend_total: "Main Dashboard Dividend Total",
+		this.state = {
+			year: "",
+			month: "",
 		};
+		this.months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		this.monthLabels = {
+			Jan: "Янв",
+			Feb: "Фев",
+			Mar: "Мар",
+			Apr: "Апр",
+			May: "Май",
+			Jun: "Июн",
+			Jul: "Июл",
+			Aug: "Авг",
+			Sep: "Сен",
+			Oct: "Окт",
+			Nov: "Ноя",
+			Dec: "Дек",
+		};
+		this.fullMonthLabels = {
+			Jan: "Январь",
+			Feb: "Февраль",
+			Mar: "Март",
+			Apr: "Апрель",
+			May: "Май",
+			Jun: "Июнь",
+			Jul: "Июль",
+			Aug: "Август",
+			Sep: "Сентябрь",
+			Oct: "Октябрь",
+			Nov: "Ноябрь",
+			Dec: "Декабрь",
+		};
+		this.years = [];
+		this.data = null;
 
 		this.make_layout();
-		this.load_context();
+		this.bind_events();
+		this.load_data();
 	}
 
 	make_layout() {
 		this.wrapper.find(".layout-main-section-wrapper").addClass("main-dashboard-layout");
-		this.page.main.removeClass("frappe-card");
 		this.wrapper.find(".page-head").addClass("main-dashboard-page-head");
+		this.page.main.removeClass("frappe-card");
 
 		this.page.main.html(`
-			<div class="main-dashboard-screen">
-				<div class="main-dashboard-panel">
-					<div class="main-dashboard-tabs" data-region="tabs"></div>
-					<div class="main-dashboard-chart main-dashboard-chart--primary" data-region="main-chart"></div>
-					<div class="main-dashboard-bottom">
-						<div class="main-dashboard-mini-chart">
-							<div class="main-dashboard-section-label">Месячная динамика</div>
-							<div data-region="mini-chart"></div>
+			<div class="mds-screen">
+				<section class="mds-main">
+					<div class="mds-filters">
+						<div class="mds-filter-label">ФИЛЬТР ГОДА</div>
+						<div class="mds-year-select">
+							<button class="mds-select" type="button" data-year-toggle aria-expanded="false">
+								<span data-region="selected-year">...</span>
+								<span class="mds-chevron"></span>
+							</button>
+							<div class="mds-year-menu" data-region="year-menu"></div>
 						</div>
-						<div class="main-dashboard-summary">
-							<div class="main-dashboard-summary-table" data-region="summary-table"></div>
-						</div>
-						<div class="main-dashboard-side">
-							<div class="main-dashboard-side-metrics" data-region="side-metrics"></div>
-							<div class="main-dashboard-dividend">
-								<div data-region="dividend-card"></div>
-								<div class="main-dashboard-dividend-label" data-region="balance-label">${__("Сальдо на конец")}</div>
-								<div class="main-dashboard-dividend-update-label">${__("Последнее обновление")}</div>
-								<div class="main-dashboard-dividend-update-time" data-region="updated-at"></div>
-							</div>
-						</div>
+						<div class="mds-filter-label">ФИЛЬТР МЕСЯЦА</div>
+						<div class="mds-month-grid" data-region="month-grid"></div>
 					</div>
-					<div class="main-dashboard-footer" data-region="footer-ticker"></div>
-				</div>
+					<div class="mds-content">
+						<section class="mds-card mds-card--wide mds-sales-card">
+							<div class="mds-card-head">
+								<h2>ОБЪЕМ ПРОДАЖ (ТОННЫ)</h2>
+							</div>
+							<div class="mds-bar-chart" data-region="sales-chart"></div>
+						</section>
+						<section class="mds-card mds-card--donut">
+							<div class="mds-card-head">
+								<h2>МАРЖА И БОНУС</h2>
+							</div>
+							<div data-region="margin-bonus"></div>
+						</section>
+						<section class="mds-card mds-average-card">
+							<div data-region="average-check"></div>
+						</section>
+						<section class="mds-card mds-balance-card">
+							<div data-region="balance-details"></div>
+						</section>
+						<div class="mds-stack-column">
+							<section class="mds-card mds-break-card">
+								<div data-region="unit-cost"></div>
+							</section>
+							<section class="mds-card mds-health-panel">
+								<div data-region="business-health"></div>
+							</section>
+						</div>
+						<section class="mds-card mds-returns-card">
+							<h2>АНАЛИЗ ВОЗВРАТОВ</h2>
+							<div class="mds-return-chart" data-region="return-chart"></div>
+						</section>
+						<section class="mds-card mds-profit-card">
+							<div class="mds-card-head">
+								<h2>ЧИСТАЯ ПРИБЫЛЬ И РЕНТАБЕЛЬНОСТЬ</h2>
+								<div class="mds-legend mds-legend--compact">
+									<span><i class="is-blue"></i> Чистая прибыль</span>
+									<span><i class="is-green"></i> Рентабельность</span>
+								</div>
+							</div>
+							<div class="mds-profit-chart" data-region="profit-chart"></div>
+						</section>
+					</div>
+				</section>
 			</div>
 		`);
 
@@ -69,307 +125,400 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			route: "main-dashboard",
 		});
 
-		this.$tabs = this.page.main.find('[data-region="tabs"]');
-		this.$mainChart = this.page.main.find('[data-region="main-chart"]');
-		this.$miniChart = this.page.main.find('[data-region="mini-chart"]');
-		this.$summaryTable = this.page.main.find('[data-region="summary-table"]');
-		this.$sideMetrics = this.page.main.find('[data-region="side-metrics"]');
-		this.$dividendCard = this.page.main.find('[data-region="dividend-card"]');
-		this.$balanceLabel = this.page.main.find('[data-region="balance-label"]');
-		this.$updatedAt = this.page.main.find('[data-region="updated-at"]');
-		this.$footerTicker = this.page.main.find('[data-region="footer-ticker"]');
+		this.$salesChart = this.page.main.find('[data-region="sales-chart"]');
+		this.$returnChart = this.page.main.find('[data-region="return-chart"]');
+		this.$profitChart = this.page.main.find('[data-region="profit-chart"]');
+		this.$selectedYear = this.page.main.find('[data-region="selected-year"]');
+		this.$yearMenu = this.page.main.find('[data-region="year-menu"]');
+		this.$monthGrid = this.page.main.find('[data-region="month-grid"]');
+		this.$marginBonus = this.page.main.find('[data-region="margin-bonus"]');
+		this.$averageCheck = this.page.main.find('[data-region="average-check"]');
+		this.$balanceDetails = this.page.main.find('[data-region="balance-details"]');
+		this.$unitCost = this.page.main.find('[data-region="unit-cost"]');
+		this.$businessHealth = this.page.main.find('[data-region="business-health"]');
 	}
 
-	load_context() {
-		frappe.call({
-			method: "dashboards.dashboards.page.main_dashboard.main_dashboard.get_dashboard_context",
-			callback: (r) => {
-				this.context = r.message || {};
-				this.render_static_regions();
-				this.render_widgets();
-			},
+	bind_events() {
+		this.page.main.off(".main-dashboard");
+
+		this.page.main.on("click.main-dashboard", "[data-year-toggle]", (event) => {
+			event.stopPropagation();
+			const $select = $(event.currentTarget).closest(".mds-year-select");
+			const isOpen = $select.hasClass("is-open");
+			$select.toggleClass("is-open", !isOpen);
+			$(event.currentTarget).attr("aria-expanded", isOpen ? "false" : "true");
 		});
-	}
 
-	render_static_regions() {
-		this.render_tabs();
-		this.render_main_timeline();
-		this.render_mini_timeline();
-		this.render_summary_table();
-		this.render_side_metrics();
-		this.render_footer();
-		this.$balanceLabel.text(this.context.balance_label || __("Сальдо на конец"));
-		this.$updatedAt.text(this.context.dividend_updated_at || "");
-	}
+		this.page.main.on("click.main-dashboard", "[data-year]", (event) => {
+			const year = String($(event.currentTarget).data("year"));
+			this.load_data({ year, month: this.state.month });
+		});
 
-	render_tabs() {
-		const tabs = this.context.tabs || [];
-		this.$tabs.html(
-			tabs
-				.map(
-					(tab) => `
-						<button class="main-dashboard-tab ${tab.active ? "is-active" : ""}" data-route="${tab.route}">
-							${frappe.utils.escape_html(tab.label)}
-						</button>
-					`
-				)
-				.join("")
-		);
+		this.page.main.on("click.main-dashboard", "[data-month]", (event) => {
+			const month = String($(event.currentTarget).data("month"));
+			this.load_data({ year: this.state.year, month });
+		});
 
-		this.$tabs.find(".main-dashboard-tab").on("click", (e) => {
-			const route = $(e.currentTarget).data("route");
-			if (route) {
-				frappe.set_route(route.replace(/^\/app\//, ""));
+		$(document).off("click.main-dashboard-year").on("click.main-dashboard-year", (event) => {
+			if ($(event.target).closest(".mds-year-select").length) {
+				return;
 			}
+
+			this.page.main.find(".mds-year-select").removeClass("is-open");
+			this.page.main.find("[data-year-toggle]").attr("aria-expanded", "false");
 		});
 	}
 
-	render_summary_table() {
-		const rows = this.context.summary_rows || [];
-		this.$summaryTable.html(
-			rows
-				.map(
-					(row) => `
-						<div class="main-dashboard-summary-row">
-							<div class="main-dashboard-summary-title">${frappe.utils.escape_html(row.label)}</div>
-							<div class="main-dashboard-summary-metrics">
-								${row.metric_keys
-									.map(
-										(metricKey, index) => `
-											<div class="main-dashboard-summary-metric">
-												<div class="main-dashboard-number-slot" data-number-card="${metricKey}"></div>
-												<div class="main-dashboard-summary-caption">${frappe.utils.escape_html(
-													row.metric_labels[index]
-												)}</div>
-											</div>
-										`
-									)
-									.join("")}
-							</div>
-						</div>
-					`
-				)
-				.join("")
-		);
+	render_year_option(year) {
+		return `<button class="mds-year-option ${year === this.state.year ? "is-active" : ""}" type="button" data-year="${year}">${year}</button>`;
 	}
 
-	render_side_metrics() {
-		const items = this.context.side_metrics || [];
-		this.$sideMetrics.html(
-			items
-				.map(
-					(item) => `
-						<div class="main-dashboard-side-metric">
-							<div class="main-dashboard-side-number" data-number-card="${item.metric_key}"></div>
-							<div class="main-dashboard-side-label">${frappe.utils.escape_html(item.label)}</div>
-						</div>
-					`
-				)
-				.join("")
-		);
+	render_month_button(month) {
+		return `<button class="mds-month ${month === this.state.month ? "is-active" : ""}" type="button" data-month="${month}">${this.monthLabels[month] || month}</button>`;
 	}
 
-	render_footer() {
-		const items = this.context.footer_items || [];
-		if (!items.length) {
-			this.$footerTicker.empty();
-			return;
-		}
-
-		const renderItem = (item) => `
-			<div class="main-dashboard-footer-item">
-				<span class="main-dashboard-footer-label">${frappe.utils.escape_html(item.label || "")}</span>
-				<span class="main-dashboard-footer-value">${this.formatNumber(item.value)}</span>
+	render_balance_item(label, value) {
+		return `
+			<div class="mds-balance-item">
+				<div class="mds-balance-row">
+					<span>${frappe.utils.escape_html(label)}</span>
+					<strong>${frappe.utils.escape_html(value)}</strong>
+				</div>
 			</div>
 		`;
+	}
 
-		const groupMarkup = items.map(renderItem).join("");
-		this.$footerTicker.html(`
-			<div class="main-dashboard-footer-track">
-				<div class="main-dashboard-footer-group">${groupMarkup}</div>
-				<div class="main-dashboard-footer-group" aria-hidden="true">${groupMarkup}</div>
+	load_data(filters = {}) {
+		this.show_loading();
+		return frappe.call({
+			method: "dashboards.dashboards.page.main_dashboard.main_dashboard.get_dashboard_data",
+			args: {
+				year: filters.year || this.state.year || undefined,
+				month: filters.month || this.state.month || undefined,
+			},
+		}).then((response) => {
+			this.data = response.message || {};
+			const backendFilters = this.data.filters || {};
+			this.years = backendFilters.years || [];
+			this.state.year = backendFilters.selected_year || "";
+			this.state.month = backendFilters.selected_month || "";
+			this.render();
+		}).catch(() => {
+			frappe.msgprint(__("Не удалось загрузить данные главной панели."));
+		});
+	}
+
+	show_loading() {
+		const loadingMarkup = `<div class="mds-loading">Загрузка...</div>`;
+		this.$salesChart.html(loadingMarkup);
+		this.$returnChart.html(loadingMarkup);
+		this.$profitChart.html(loadingMarkup);
+		this.$marginBonus.html(loadingMarkup);
+		this.$averageCheck.html(loadingMarkup);
+		this.$balanceDetails.html(loadingMarkup);
+		this.$unitCost.html(loadingMarkup);
+		this.$businessHealth.html(loadingMarkup);
+	}
+
+	render() {
+		this.render_filters();
+		this.render_sales_chart();
+		this.render_returns_chart();
+		this.render_margin_bonus();
+		this.render_average_check();
+		this.render_balance_details();
+		this.render_unit_cost();
+		this.render_business_health_card();
+		this.render_profit_chart();
+	}
+
+	render_filters() {
+		this.$selectedYear.text(this.state.year || "...");
+		this.$yearMenu.html(this.years.map((year) => this.render_year_option(year)).join(""));
+		this.$monthGrid.html(this.months.map((month) => this.render_month_button(month)).join(""));
+	}
+
+	render_sales_chart() {
+		const salesData = this.data?.sales_volume?.series || [];
+		const maxSales = Math.max(1, ...salesData.map((row) => Number(row.tons || 0)));
+		this.$salesChart.html(`
+			<div class="mds-bar-grid">
+				${this.months
+					.map((month, index) => {
+						const row = salesData[index] || { tons: 0, amount_display: "" };
+						return this.render_chart_bar({
+							month,
+							row,
+							maxValue: maxSales,
+							active: month === this.state.month,
+							barClass: "mds-bar",
+						});
+					})
+					.join("")}
 			</div>
 		`);
-
-		this.setup_footer_ticker(items, renderItem);
 	}
 
-	setup_footer_ticker(items, renderItem) {
-		window.requestAnimationFrame(() => {
-			const $track = this.$footerTicker.find(".main-dashboard-footer-track");
-			const $groups = $track.find(".main-dashboard-footer-group");
-			if (!$track.length || !$groups.length) {
-				return;
-			}
-
-			const containerWidth = this.$footerTicker.innerWidth() || 0;
-			let groupWidth = $groups.first().outerWidth(true) || 0;
-
-			if (containerWidth && groupWidth && groupWidth < containerWidth * 1.25) {
-				const repeatCount = Math.max(2, Math.ceil((containerWidth * 1.25) / groupWidth));
-				const repeatedMarkup = Array.from({ length: repeatCount }, () => items)
-					.flat()
-					.map(renderItem)
-					.join("");
-
-				$groups.html(repeatedMarkup);
-				groupWidth = $groups.first().outerWidth(true) || groupWidth;
-			}
-
-			const pixelsPerSecond = 110;
-			const durationSeconds = Math.max(groupWidth / pixelsPerSecond, 8);
-
-			$track.css("--ticker-distance", `${groupWidth}px`);
-			$track.css("--ticker-duration", `${durationSeconds}s`);
-		});
-	}
-
-	render_widgets() {
-		Object.entries(this.widget_names).forEach(([key, widgetName]) => {
-			if (key === "main_chart" || key === "mini_chart") {
-				return;
-			}
-
-			if (key === "dividend_total") {
-				this.mount_number_card(this.$dividendCard, widgetName);
-				return;
-			}
-
-			const $slot = this.page.main.find(`[data-number-card="${key}"]`);
-			if ($slot.length) {
-				this.mount_number_card($slot, widgetName);
-			}
-		});
-	}
-
-	render_main_timeline() {
-		const years = this.context.timeline_years || [];
-		const flattenedValues = years.flatMap((year) => year.values || []);
-		const maxValue = flattenedValues.length ? Math.max(...flattenedValues, 0) : 0;
-		const chartScale = this.getChartScale(maxValue);
-		const yTicks = this.buildTickValues(chartScale);
-
-		this.$mainChart.html(`
-			<div class="main-dashboard-timeline">
-				<div class="main-dashboard-timeline-grid">
-					${yTicks
-						.map(
-							(tick) => `
-								<div class="main-dashboard-timeline-line" style="bottom:${tick.percent}%">
-									<div class="main-dashboard-timeline-tick">${frappe.utils.escape_html(tick.label)}</div>
+	render_returns_chart() {
+		const returnData = this.data?.returns_analysis?.series || [];
+		this.$returnChart.html(`
+			<div class="mds-return-table">
+				<div class="mds-return-table-head">
+					<span>Месяц</span>
+					<span>Тонна</span>
+					<span>Сумма</span>
+				</div>
+				<div class="mds-return-table-body">
+					${this.months
+						.map((month, index) => {
+							const row = returnData[index] || { tons_display: "", amount_display: "" };
+							return `
+								<div class="mds-return-table-row ${month === this.state.month ? "is-active" : ""}">
+									<span>${frappe.utils.escape_html(this.fullMonthLabels[month] || month)}</span>
+									<strong>${frappe.utils.escape_html(row.tons_display || "0t")}</strong>
+									<strong>${frappe.utils.escape_html(row.amount_display || "0")}</strong>
 								</div>
-							`
-						)
-						.join("")}
-				</div>
-				<div class="main-dashboard-timeline-years">
-					${years
-						.map((year) => this.render_timeline_year(year, chartScale.max))
+							`;
+						})
 						.join("")}
 				</div>
 			</div>
 		`);
 	}
 
-	render_timeline_year(year, maxValue) {
-		const months = [
-			"Январь",
-			"Февраль",
-			"Март",
-			"Апрель",
-			"Май",
-			"Июнь",
-			"Июль",
-			"Август",
-			"Сентябрь",
-			"Октябрь",
-			"Ноябрь",
-			"Декабрь",
-		];
+	render_chart_bar({ month, row, maxValue, active, barClass }) {
+		const tons = Number(row.tons || 0);
+		const height = maxValue > 0 && tons > 0 ? Math.max((tons / maxValue) * 100, 12) : 0;
 
 		return `
-			<div class="main-dashboard-timeline-year">
-				<div class="main-dashboard-timeline-months">
-					${months
-						.map((month, index) => {
-							const value = Number((year.values || [])[index] || 0);
-							const height = this.getBarHeightPercent(value, maxValue, { minPositivePercent: 1 });
-							return `
-								<div class="main-dashboard-timeline-month">
-									<div class="main-dashboard-timeline-value">${frappe.utils.escape_html(this.formatCompactNumber(value))}</div>
-									<div class="main-dashboard-timeline-bar-wrap">
-										<div class="main-dashboard-timeline-bar" style="height:${height}%"></div>
-									</div>
-									<div class="main-dashboard-timeline-label">${frappe.utils.escape_html(month)}</div>
-								</div>
-							`;
-						})
-						.join("")}
+			<div class="mds-bar-item ${active ? "is-active" : ""}">
+				<div class="mds-bar-ton">${row.tons_display || ""}</div>
+				<div class="mds-bar-shell">
+					<div class="${barClass} ${active ? "is-active" : ""} ${tons ? "" : "is-empty"}" style="height:${height}%">
+						${row.amount_display ? `<span class="mds-bar-amount">${frappe.utils.escape_html(row.amount_display)}</span>` : ""}
+					</div>
 				</div>
-				<div class="main-dashboard-timeline-year-label">${frappe.utils.escape_html(String(year.year || ""))}</div>
+				<span class="mds-bar-month">${frappe.utils.escape_html(this.monthLabels[month] || month)}</span>
 			</div>
 		`;
 	}
 
-	render_mini_timeline() {
-		const years = this.context.mini_timeline_years || [];
-		const monthLabels = [
-			"Январь",
-			"Февраль",
-			"Март",
-			"Апрель",
-			"Май",
-			"Июнь",
-			"Июль",
-			"Август",
-			"Сентябрь",
-			"Октябрь",
-			"Ноябрь",
-			"Декабрь",
-		];
-		const maxValue = years.length ? Math.max(...years.flatMap((year) => year.values || []), 0) : 0;
-		const chartScale = this.getChartScale(maxValue);
-		const palette = ["is-older", "is-middle", "is-latest"];
+	render_margin_bonus() {
+		const data = this.data?.margin_bonus || {};
+		const marginPercent = Math.max(0, Number(data.margin_percent || 0));
+		const bonusPercent = Math.max(0, Number(data.bonus_percent || 0));
+		const marketingPercent = Math.max(0, Number(data.marketing_percent || 0));
+		const netProfitPercent = Math.max(0, Number(data.net_profit_percent || 0));
+		const stop1 = marginPercent;
+		const stop2 = stop1 + bonusPercent;
+		const stop3 = stop2 + marketingPercent;
+		this.$marginBonus.html(`
+			<div class="mds-donut-wrap">
+				<div class="mds-donut" style="background: conic-gradient(var(--mds-blue) 0 ${stop1}%, var(--mds-mint) ${stop1}% ${stop2}%, var(--mds-gold) ${stop2}% ${stop3}%, var(--mds-red) ${stop3}% 100%);">
+					<div class="mds-donut-core">
+						<strong>${frappe.utils.escape_html(data.center_value || "0%")}</strong>
+						<span>${frappe.utils.escape_html(data.center_label || "Чистая прибыль")}</span>
+					</div>
+				</div>
+			</div>
+			<div class="mds-legend">
+				<span><i class="is-blue"></i> ${frappe.utils.escape_html(data.margin_display || "Маржа (0%)")}</span>
+				<span><i class="is-gold"></i> ${frappe.utils.escape_html(data.marketing_display || "Маркетинг (0%)")}</span>
+				<span><i class="is-mint"></i> ${frappe.utils.escape_html(data.bonus_display || "Бонус (0%)")}</span>
+				<span><i class="is-red"></i> ${frappe.utils.escape_html(data.net_profit_display || "Чистая прибыль (0%)")}</span>
+			</div>
+		`);
+	}
 
-		this.$miniChart.html(`
-			<div class="main-dashboard-mini-timeline">
-				<div class="main-dashboard-mini-timeline-grid">
-					${this.buildTickValues(chartScale)
+	render_delta_badge(value, valueDisplay) {
+		const numericValue = Number(value || 0);
+		const isUp = numericValue >= 0;
+		const cssClass = isUp ? "is-up" : "is-down";
+		const trendIcon = isUp
+			? `
+				<svg class="mds-trend-arrow ${cssClass}" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+					<path d="M3 14L8 9L11 12L17 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+					<path d="M12.5 6H17V10.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+				</svg>
+			`
+			: `
+				<svg class="mds-trend-arrow ${cssClass}" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+					<path d="M3 6L8 11L11 8L17 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+					<path d="M12.5 14H17V9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+				</svg>
+			`;
+		return `
+			<em class="${cssClass}">
+				${trendIcon}
+				${frappe.utils.escape_html(valueDisplay || "0.0%")}
+			</em>
+		`;
+	}
+
+	render_average_check() {
+		const data = this.data?.average_check || {};
+		this.$averageCheck.html(`
+			<h2>СРЕДНИЙ ЧЕК</h2>
+			<div class="mds-price-row">
+				<div>
+					<span>Цена продажи</span>
+					<strong>${frappe.utils.escape_html(data.selling_price_display || "0 UZS")}</strong>
+				</div>
+				${this.render_delta_badge(data.selling_change, data.selling_change_display)}
+			</div>
+			<div class="mds-price-row">
+				<div>
+					<span>Себестоимость</span>
+					<strong class="is-muted">${frappe.utils.escape_html(data.cost_price_display || "0 UZS")}</strong>
+				</div>
+				${this.render_delta_badge(data.cost_change, data.cost_change_display)}
+			</div>
+		`);
+	}
+
+	render_business_health() {
+		const data = this.data?.average_check || {};
+		const healthRatio = Number(data.health_ratio || 0);
+		const healthRatioCapped = Math.max(0, Math.min(100, Number(data.health_ratio_capped || 0)));
+		return `
+			<div class="mds-health-card mds-health-card--embedded">
+				<div class="mds-health-head">
+					<div>
+						<span>Состояние бизнеса</span>
+						<strong>${frappe.utils.escape_html(data.health_ratio_display || "0.0%")}</strong>
+					</div>
+					<em class="${healthRatio <= 30 ? "is-good" : healthRatio <= 50 ? "is-warn" : "is-risk"}">
+						Долг / Продажи
+					</em>
+				</div>
+				<div class="mds-health-bar">
+					<div class="mds-health-scale"></div>
+					<div class="mds-health-pointer" style="left: ${healthRatioCapped}%;"></div>
+				</div>
+				<div class="mds-health-ticks">
+					<span>0%</span>
+					<span>30%</span>
+					<span>50%</span>
+					<span>100%</span>
+				</div>
+				<div class="mds-health-meta">
+					<div>
+						<span>Долг</span>
+						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
+					</div>
+					<div>
+						<span>Продажи</span>
+						<strong>${frappe.utils.escape_html(data.health_sales_display || "0 UZS")}</strong>
+					</div>
+				</div>
+			</div>
+		`;
+	}
+
+	render_business_health_card() {
+		this.$businessHealth.html(`
+			<h2>СОСТОЯНИЕ БИЗНЕСА</h2>
+			${this.render_business_health()}
+		`);
+	}
+
+	render_balance_details() {
+		const data = this.data?.balance_details || {};
+		const items = data.items || [];
+		this.$balanceDetails.html(`
+			<h2>ДЕТАЛИ БАЛАНСА</h2>
+			${items
+				.map((item) => this.render_balance_item(item.label, item.value))
+				.join("")}
+			<div class="mds-total-balance">
+				<span>ОБЩИЙ БАЛАНС</span>
+				<strong>${frappe.utils.escape_html(data.total_balance || "0 UZS")}</strong>
+			</div>
+		`);
+	}
+
+	render_unit_cost() {
+		const breakEven = this.data?.break_even || {};
+		const planRatio = Math.max(0, Math.min(100, Number(breakEven.plan_ratio || 0)));
+		const currentRatio = Math.max(planRatio, Math.min(100, Number(breakEven.current_ratio || 0)));
+		const greenWidth = Math.max(currentRatio - planRatio, 0);
+		this.$unitCost.html(`
+			<h2>ТОЧКА БЕЗУБЫТОЧНОСТИ</h2>
+			<div class="mds-progress-head">
+				<span class="mds-progress-title">${frappe.utils.escape_html(breakEven.title || "Производственный прогресс")}</span>
+				<strong class="mds-progress-summary">${frappe.utils.escape_html(breakEven.summary || "0t / 0t")}</strong>
+			</div>
+			<div class="mds-progress" style="--mds-plan-ratio:${planRatio}%; --mds-current-ratio:${currentRatio}%; --mds-green-width:${greenWidth}%;">
+				<div class="mds-progress-line mds-progress-line--red"></div>
+				<div class="mds-progress-line mds-progress-line--green"></div>
+				<span class="mds-progress-dot mds-progress-dot--start"></span>
+				<span class="mds-progress-dot mds-progress-dot--plan"></span>
+				<span class="mds-progress-dot mds-progress-dot--current"></span>
+			</div>
+			<div class="mds-progress-scale">
+				<span class="mds-progress-badge mds-progress-badge--start">${frappe.utils.escape_html(breakEven.start_label || "0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--plan">${frappe.utils.escape_html(breakEven.plan_label || "План: 0t")}</span>
+				<span class="mds-progress-badge mds-progress-badge--current">${frappe.utils.escape_html(breakEven.current_label || "Текущее: 0t")}</span>
+			</div>
+		`);
+	}
+
+	render_profit_chart() {
+		const profitData = this.data?.net_profit_profitability?.series || [];
+		const maxProfitValue = Math.max(100, ...profitData.map((row) => Number(row.profit || 0)));
+		const maxProfitabilityValue = Math.max(10, ...profitData.map((row) => Number(row.profitability || 0)));
+		const axisPadding = Math.max(maxProfitValue * 0.2, 10);
+		const axisTop = Math.ceil((maxProfitValue + axisPadding) / 10) * 10;
+		const axisValues = [axisTop, axisTop * (2 / 3), axisTop * (1 / 3), 0];
+		const formatAxisValue = (value) => {
+			if (!value) {
+				return "0 K";
+			}
+
+			const absoluteAmount = value * 1000;
+			if (Math.abs(absoluteAmount) >= 1000000) {
+				const millions = absoluteAmount / 1000000;
+				const roundedMillions = Math.abs(millions) >= 10 ? Math.round(millions) : Number(millions.toFixed(1));
+				return `${roundedMillions} M`;
+			}
+
+			const roundedThousands = value >= 10 ? Math.round(value) : Number(value.toFixed(1));
+			return `${roundedThousands} K`;
+		};
+		this.$profitChart.html(`
+			<div class="mds-profit-plot">
+				<div class="mds-profit-axis">
+					${axisValues
 						.map(
-							(tick) => `
-								<div class="main-dashboard-mini-timeline-line" style="bottom:${tick.percent}%">
-									<div class="main-dashboard-mini-timeline-tick">${frappe.utils.escape_html(tick.label)}</div>
+							(value) => `
+								<div class="mds-profit-axis-row">
+									<span class="mds-profit-axis-label">${formatAxisValue(value)}</span>
+									<span class="mds-profit-axis-line"></span>
 								</div>
 							`
 						)
 						.join("")}
 				</div>
-				<div class="main-dashboard-mini-timeline-groups">
-					${monthLabels
-						.map((month, monthIndex) => {
+				<div class="mds-profit-bars" style="grid-template-columns: repeat(${profitData.length || 1}, minmax(72px, 1fr));">
+					${profitData
+						.map((row) => {
+							const profitValue = Number(row.profit || 0);
+							const profitabilityValue = Number(row.profitability || 0);
+							const profitHeight = profitValue ? Math.max((profitValue / axisTop) * 100, 3) : 0;
+							const profitabilityHeight = profitabilityValue ? Math.max((profitabilityValue / maxProfitabilityValue) * 100, 3) : 0;
 							return `
-								<div class="main-dashboard-mini-timeline-group">
-									<div class="main-dashboard-mini-timeline-bars">
-										${years
-											.map((year, yearIndex) => {
-												const value = Number((year.values || [])[monthIndex] || 0);
-												const height = this.getBarHeightPercent(value, chartScale.max);
-												const toneClass = palette[yearIndex] || "is-latest";
-												return `
-													<div class="main-dashboard-mini-timeline-bar-wrap">
-														<div
-															class="main-dashboard-mini-timeline-bar ${toneClass}"
-															title="${frappe.utils.escape_html(String(year.year || ""))}: ${frappe.utils.escape_html(
-																this.formatNumber(value)
-															)}"
-															style="height:${height}%"
-														></div>
-													</div>
-												`;
-											})
-											.join("")}
+								<div class="mds-profit-group">
+									<div class="mds-profit-columns">
+										<div class="mds-profit-bar-wrap">
+											<span class="mds-profit-value mds-profit-value--blue">${frappe.utils.escape_html(row.profit_display || "0K")}</span>
+											<div class="mds-profit-bar mds-profit-bar--blue ${profitValue ? "" : "is-zero"}" style="height:${profitHeight}%; width: 10px;"></div>
+										</div>
+										<div class="mds-profit-bar-wrap">
+											<span class="mds-profit-value mds-profit-value--green">${frappe.utils.escape_html(row.profitability_display || "0.0%")}</span>
+											<div class="mds-profit-bar mds-profit-bar--green ${profitabilityValue ? "" : "is-zero"}" style="height:${profitabilityHeight}%; width: 10px;"></div>
+										</div>
 									</div>
-									<div class="main-dashboard-mini-timeline-label">${frappe.utils.escape_html(month)}</div>
+									<span class="mds-profit-month">${frappe.utils.escape_html(this.monthLabels[row.month] || row.month)}</span>
 								</div>
 							`;
 						})
@@ -377,92 +526,5 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				</div>
 			</div>
 		`);
-	}
-
-	getChartScale(maxValue, tickCount = 3) {
-		const safeMax = maxValue > 0 ? maxValue : 1;
-		const roughStep = safeMax / tickCount;
-		const magnitude = 10 ** Math.floor(Math.log10(roughStep || 1));
-		const normalizedStep = roughStep / magnitude;
-		const stepCandidates = [1, 2, 2.5, 5, 10];
-		const roundedStep = stepCandidates.find((candidate) => normalizedStep <= candidate) || 10;
-		const step = Math.max(roundedStep * magnitude, 1);
-		const chartMax = Math.max(step * tickCount, safeMax);
-		return { max: chartMax, step, tickCount };
-	}
-
-	buildTickValues(chartScale) {
-		const { max, step, tickCount } = chartScale;
-		return Array.from({ length: tickCount + 1 }, (_, index) => {
-			const value = step * index;
-			return {
-				value,
-				label: this.formatAxisNumber(value),
-				percent: (value / max) * 100,
-			};
-		});
-	}
-
-	getBarHeightPercent(value, chartMax, options = {}) {
-		const numericValue = Number(value || 0);
-		const minPositivePercent = Number(options.minPositivePercent || 0);
-		if (!chartMax || numericValue <= 0) {
-			return 0;
-		}
-
-		const rawPercent = (numericValue / chartMax) * 100;
-		return minPositivePercent ? Math.max(rawPercent, minPositivePercent) : rawPercent;
-	}
-
-	mount_chart($container, chartName, height) {
-		$container.empty();
-		frappe.widget.make_widget({
-			widget_type: "chart",
-			container: $container,
-			label: chartName,
-			chart_name: chartName,
-			name: chartName,
-			height: height,
-			width: "Full",
-		});
-	}
-
-	mount_number_card($container, cardName) {
-		$container.empty();
-		frappe.widget.make_widget({
-			widget_type: "number_card",
-			container: $container,
-			label: cardName,
-			number_card_name: cardName,
-			name: cardName,
-		});
-	}
-
-	formatNumber(value) {
-		const numericValue = Number(value || 0);
-		return numericValue.toLocaleString("en-US").replace(/,/g, " ");
-	}
-
-	formatCompactNumber(value) {
-		const numericValue = Number(value || 0);
-		if (!numericValue) {
-			return "0";
-		}
-		if (Math.abs(numericValue) >= 1000) {
-			const compact = numericValue / 1000;
-			return `${Number.isInteger(compact) ? compact : compact.toFixed(1).replace(/\.0$/, "")}K`;
-		}
-		return this.formatNumber(numericValue);
-	}
-
-	formatAxisNumber(value) {
-		const numericValue = Number(value || 0);
-		if (!numericValue) {
-			return "0K";
-		}
-		if (Math.abs(numericValue) >= 1000) {
-			return `${Math.round(numericValue / 1000)}K`;
-		}
-		return `${Math.round(numericValue)}`;
 	}
 };

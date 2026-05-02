@@ -481,6 +481,15 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
     values = sorted(grouped.values(), key=lambda row: flt(row["sales"]), reverse=True)
     total_sales = sum(flt(row["sales"]) for row in values)
     total_cost = sum(flt(row["cost"]) for row in values)
+    if values and not total_cost and total_sales:
+        period_cogs_total = flt(get_cogs_total(selected_year, month))
+        if period_cogs_total:
+            for row in values:
+                row["cost"] = period_cogs_total * flt(row["sales"]) / total_sales
+                row["margin"] = flt(row["sales"]) - flt(row["cost"])
+                row["net_margin"] = flt(row["margin"]) - flt(row["discount"])
+            total_cost = sum(flt(row["cost"]) for row in values)
+
     total_qty = sum(flt(row["qty"]) for row in values)
     total_returns = sum(flt(row["returns"]) for row in values)
     total_margin = sum(flt(row["margin"]) for row in values)

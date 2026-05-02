@@ -11,7 +11,6 @@ TARGET_DIR = Path(frappe.get_app_path("dashboards", "public", "images", "dashboa
 
 IMAGE_MAP = {
     "DASHBOARD.jpg": "main-dashboard.jpg",
-    "KPI.jpg": "kpi-dashboard.jpg",
     "Анализ по месяц.jpg": "monthly-analysis.jpg",
     "ГЛАВНЫЙ.jpg": "overview-dashboard.jpg",
     "Дивидент.jpg": "dividend-analysis.jpg",
