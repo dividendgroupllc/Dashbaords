@@ -22,7 +22,46 @@ dashboards.ui.SalesDashboardPage = class SalesDashboardPage {
 		this.load_context();
 	}
 
+	ensure_runtime_styles() {
+		if (document.getElementById("sales-dashboard-table-layout-fix")) {
+			return;
+		}
+
+		const style = document.createElement("style");
+		style.id = "sales-dashboard-table-layout-fix";
+		style.textContent = `
+			.sales-dashboard-table-panel {
+				width: min(100%, 980px) !important;
+				max-width: calc(100% - 20px) !important;
+				margin: 0 10px 0 auto !important;
+				transform: none !important;
+				box-sizing: border-box !important;
+			}
+			.sales-dashboard-table-wrap {
+				max-width: 100% !important;
+				overflow: auto !important;
+			}
+			.sales-dashboard-table {
+				width: max-content !important;
+				min-width: 980px !important;
+				table-layout: auto !important;
+				border-collapse: collapse !important;
+			}
+			.sales-dashboard-table .is-text {
+				min-width: 280px !important;
+				text-align: left !important;
+			}
+			.sales-dashboard-table .is-number {
+				min-width: 112px !important;
+				text-align: right !important;
+				white-space: nowrap !important;
+			}
+		`;
+		document.head.appendChild(style);
+	}
+
 	make_layout() {
+		this.ensure_runtime_styles();
 		this.wrapper.find(".layout-main-section-wrapper").addClass("sales-dashboard-layout");
 		this.wrapper.find(".page-head").addClass("sales-dashboard-page-head");
 		this.page.main.removeClass("frappe-card");

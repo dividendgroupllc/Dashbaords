@@ -118,8 +118,8 @@
 
 .sales-dashboard-table-panel {
 	width: min(100%, 980px);
-	margin: 0;
-	transform: translateX(260px);
+	margin: 0 10px 0 auto;
+	transform: none;
 	border: 1px solid rgba(102, 151, 94, 0.66);
 	border-radius: 10px;
 	background: linear-gradient(180deg, rgba(223, 252, 194, 0.72) 0%, rgba(206, 246, 172, 0.8) 100%);
@@ -129,6 +129,7 @@
 .sales-dashboard-table-wrap {
 	max-height: calc(100vh - 220px);
 	overflow: auto;
+	max-width: 100%;
 }
 
 .sales-dashboard-table-empty {
