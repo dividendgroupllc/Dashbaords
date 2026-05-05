@@ -80,6 +80,38 @@
 	padding: 14px 14px 18px;
 }
 
+.supplier-dashboard-view-switch {
+	padding: 0 14px 0;
+}
+
+.supplier-dashboard-view-chip-group {
+	display: inline-flex;
+	gap: 8px;
+	padding: 6px;
+	border: 1px solid #dbe4f1;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.88);
+	box-shadow: 0 8px 18px rgba(31, 48, 82, 0.06);
+}
+
+.supplier-dashboard-view-chip {
+	padding: 10px 14px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: #eef4fb;
+	color: #4d627e;
+	font-size: 13px;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	cursor: pointer;
+}
+
+.supplier-dashboard-view-chip.is-active {
+	background: linear-gradient(180deg, #0f79d8 0%, #0b5fc4 100%);
+	color: #fff;
+	box-shadow: 0 8px 18px rgba(11, 95, 196, 0.18);
+}
+
 .supplier-dashboard-filters {
 	display: grid;
 	grid-template-columns: auto 110px auto minmax(0, 1fr);
@@ -191,7 +223,7 @@
 	box-shadow: inset 0 -2px 0 #8fc3ff;
 }
 
-.supplier-dashboard-supplier-link {
+.supplier-dashboard-party-link {
 	padding: 0;
 	border: 0;
 	background: transparent;
@@ -203,7 +235,7 @@
 	text-decoration-color: rgba(22, 106, 56, 0.35);
 }
 
-.supplier-dashboard-supplier-link.is-active {
+.supplier-dashboard-party-link.is-active {
 	color: #0aa94a;
 	text-decoration-color: currentColor;
 }
@@ -253,6 +285,64 @@
 	overflow: auto;
 	max-height: calc(100vh - 210px);
 	padding-right: 8px;
+	display: grid;
+	gap: 14px;
+}
+
+.supplier-dashboard-currency-pill {
+	padding: 6px 10px;
+	border-radius: 999px;
+	background: #eaf3ff;
+	color: #0b63cc;
+	font-size: 12px;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+}
+
+.supplier-dashboard-currency-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 8px;
+	border-radius: 999px;
+	background: #eef4fb;
+	color: #4d627e;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.supplier-dashboard-currency-row td {
+	padding-top: 16px;
+	padding-bottom: 6px;
+	border-bottom: 0;
+	background: #fbfdff;
+}
+
+.supplier-dashboard-currency-banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 10px;
+	border: 1px solid #dbe6f3;
+	border-radius: 8px;
+	background: #fff;
+	color: #4d627e;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.supplier-dashboard-currency-banner strong {
+	color: #0c1830;
+	font-size: 13px;
+	font-weight: 800;
+}
+
+.supplier-dashboard-currency-total td {
+	padding-top: 8px;
+	padding-bottom: 12px;
+	border-bottom: 2px solid #d8e6f5;
+	background: #f7fbff;
+	font-weight: 800;
 }
 
 .supplier-dashboard-table {
@@ -262,6 +352,11 @@
 	background: #fff;
 	font-size: 14px;
 	color: #2f2f2f;
+}
+
+.supplier-dashboard-table th,
+.supplier-dashboard-table td {
+	font-variant-numeric: tabular-nums;
 }
 
 .supplier-dashboard-table thead th {
@@ -327,6 +422,10 @@
 @media (max-width: 1180px) {
 	.supplier-dashboard-body {
 		grid-template-columns: 1fr;
+	}
+
+	.supplier-dashboard-view-switch {
+		padding: 0 12px;
 	}
 
 	.supplier-dashboard-filters {
@@ -403,6 +502,10 @@
 	.supplier-dashboard-kpis {
 		grid-template-columns: 1fr;
 		gap: 12px;
+	}
+
+	.supplier-dashboard-table-wrap {
+		max-height: none;
 	}
 
 	.supplier-dashboard-table {

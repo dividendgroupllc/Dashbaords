@@ -83,7 +83,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 						</section>
 						<section class="mds-card mds-card--donut">
 							<div class="mds-card-head">
-								<h2>МАРЖА И БОНУС</h2>
+								<h2>Маржа и бонус</h2>
 							</div>
 							<div data-region="margin-bonus"></div>
 						</section>
@@ -305,29 +305,123 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
-		const marginPercent = Math.max(0, Number(data.margin_percent || 0));
-		const bonusPercent = Math.max(0, Number(data.bonus_percent || 0));
-		const marketingPercent = Math.max(0, Number(data.marketing_percent || 0));
-		const netProfitPercent = Math.max(0, Number(data.net_profit_percent || 0));
-		const stop1 = marginPercent;
-		const stop2 = stop1 + bonusPercent;
-		const stop3 = stop2 + marketingPercent;
-		this.$marginBonus.html(`
-			<div class="mds-donut-wrap">
-				<div class="mds-donut" style="background: conic-gradient(var(--mds-blue) 0 ${stop1}%, var(--mds-mint) ${stop1}% ${stop2}%, var(--mds-gold) ${stop2}% ${stop3}%, var(--mds-red) ${stop3}% 100%);">
-					<div class="mds-donut-core">
-						<strong>${frappe.utils.escape_html(data.center_value || "0%")}</strong>
-						<span>${frappe.utils.escape_html(data.center_label || "Чистая прибыль")}</span>
-					</div>
-				</div>
-			</div>
-			<div class="mds-legend">
-				<span><i class="is-blue"></i> ${frappe.utils.escape_html(data.margin_display || "Маржа (0%)")}</span>
-				<span><i class="is-gold"></i> ${frappe.utils.escape_html(data.marketing_display || "Маркетинг (0%)")}</span>
-				<span><i class="is-mint"></i> ${frappe.utils.escape_html(data.bonus_display || "Бонус (0%)")}</span>
-				<span><i class="is-red"></i> ${frappe.utils.escape_html(data.net_profit_display || "Чистая прибыль (0%)")}</span>
-			</div>
-		`);
+
+		// Segment order clockwise from 12 o'clock: Net Profit → Margin → Bonus → Marketing
+		const SEGS = [
+			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#dc2626" },
+			{ label: "Маржа",          pct: Number(data.margin_percent || 0),      amount: data.margin_amount_display || "0 UZS",     pctDisp: data.margin_percent_display || "0%",     color: "#2563eb" },
+			{ label: "Бонус",          pct: Number(data.bonus_percent || 0),       amount: data.bonus_amount_display || "0 UZS",      pctDisp: data.bonus_percent_display || "0%",      color: "#22c55e" },
+			{ label: "Маркетинг",      pct: Number(data.marketing_percent || 0),   amount: data.marketing_amount_display || "0 UZS",  pctDisp: data.marketing_percent_display || "0%",  color: "#f0b429" },
+		];
+
+		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
+		const RIGHT_X = 278, LEFT_X = 62;
+
+		const toRad = (deg) => (deg - 90) * Math.PI / 180;
+		const pt = (r, deg) => ({ x: CX + r * Math.cos(toRad(deg)), y: CY + r * Math.sin(toRad(deg)) });
+		const f = (n) => n.toFixed(2);
+
+		const arcPath = (s, e) => {
+			const a = pt(OR, s), b = pt(OR, e), c = pt(IR, e), d = pt(IR, s);
+			const lg = (e - s) > 180 ? 1 : 0;
+			return `M${f(a.x)},${f(a.y)} A${OR},${OR} 0 ${lg} 1 ${f(b.x)},${f(b.y)} L${f(c.x)},${f(c.y)} A${IR},${IR} 0 ${lg} 0 ${f(d.x)},${f(d.y)} Z`;
+		};
+
+		// Normalize by absolute values so all segments fill 360°
+		const absSum = SEGS.reduce((s, seg) => s + Math.abs(seg.pct), 0) || 1;
+		let cumDeg = 0;
+		const built = SEGS.map((seg) => {
+			const span = (Math.abs(seg.pct) / absSum) * 360;
+			const start = cumDeg;
+			cumDeg += span;
+			return { ...seg, start, end: cumDeg, mid: start + span / 2, span };
+		});
+
+		// Per-color top-light gradient for 3D depth (light top → base → dark bottom)
+		const GRAD = {
+			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"],
+			"#2563eb": ["#93c5fd", "#2563eb", "#1e3a8a"],
+			"#22c55e": ["#86efac", "#22c55e", "#14532d"],
+			"#f0b429": ["#fde68a", "#f0b429", "#78350f"],
+		};
+		const gid = (c) => `mbg${c.replace("#", "")}`;
+		const defs = `<defs>${SEGS.map((seg) => {
+			const [hi, mid2, lo] = GRAD[seg.color] || [seg.color, seg.color, seg.color];
+			return `<linearGradient id="${gid(seg.color)}" x1="${CX}" y1="${CY - OR}" x2="${CX}" y2="${CY + OR}" gradientUnits="userSpaceOnUse">
+				<stop offset="0%" stop-color="${hi}"/>
+				<stop offset="45%" stop-color="${mid2}"/>
+				<stop offset="100%" stop-color="${lo}"/>
+			</linearGradient>`;
+		}).join("")}</defs>`;
+
+		const paths = built
+			.map((seg) => {
+				if (seg.span < 0.3) return "";
+				const dx = (10 * Math.cos(toRad(seg.mid))).toFixed(2);
+				const dy = (10 * Math.sin(toRad(seg.mid))).toFixed(2);
+				const d = arcPath(seg.start, seg.end);
+				// seg-hit stays in place (captures mouse), seg-vis moves on hover
+				return `<g class="mds-mb-segment" style="--tx:${dx}px;--ty:${dy}px">
+					<path class="mds-mb-seg-vis" d="${d}" fill="url(#${gid(seg.color)})"/>
+					<path class="mds-mb-seg-hit" d="${d}" fill="transparent"/>
+				</g>`;
+			})
+			.join("");
+
+		const connectors = built
+			.map((seg) => {
+				if (seg.span < 0.3) return "";
+				const mid = pt(OR, seg.mid);
+				const elbow = pt(ER, seg.mid);
+				const isRight = elbow.x >= CX;
+				const textX = isRight ? RIGHT_X : LEFT_X;
+				const anchor = isRight ? "start" : "end";
+				const ey = elbow.y.toFixed(2);
+				const amtText = String(seg.amount).replace(/ UZS$/, "");
+				const labelX = isRight ? textX + 5 : textX - 5;
+				return [
+					`<polyline points="${mid.x.toFixed(1)},${mid.y.toFixed(1)} ${elbow.x.toFixed(1)},${ey} ${textX},${ey}" fill="none" stroke="${seg.color}" stroke-width="1.3"/>`,
+					`<text x="${labelX}" y="${(elbow.y + 5).toFixed(1)}" text-anchor="${anchor}" fill="${seg.color}" font-size="13" font-weight="700">${frappe.utils.escape_html(amtText)}</text>`,
+				].join("");
+			})
+			.join("");
+
+		const npPct = Number(data.net_profit_percent || 0);
+		const centerColor = npPct < 0 ? "#dc2626" : "#16a34a";
+		const centerAmt = frappe.utils.escape_html(String(data.net_profit_amount_display || "").replace(/ UZS$/, ""));
+
+		const svg = `<svg class="mds-mb-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+			${defs}
+			${paths}
+			${connectors}
+			<text x="${CX}" y="${CY + 5}" text-anchor="middle" fill="${centerColor}" font-size="13" font-weight="700">${centerAmt}</text>
+		</svg>`;
+
+		const fmtAmt = (s) => frappe.utils.escape_html(String(s || "").replace(/ UZS$/, " сум"));
+		const rows = built
+			.map(
+				(seg) => `<tr class="mds-mb-row">
+					<td class="mds-mb-dot-cell"><span class="mds-mb-dot" style="background:${seg.color}"></span></td>
+					<td class="mds-mb-label-cell">${frappe.utils.escape_html(seg.label)}</td>
+					<td class="mds-mb-amount-cell">${fmtAmt(seg.amount)}</td>
+					<td class="mds-mb-pct-cell"><span class="mds-mb-badge" style="color:${seg.color};background:${seg.color}1a">${frappe.utils.escape_html(seg.pctDisp)}</span></td>
+				</tr>`
+			)
+			.join("");
+
+		const totalAmt = fmtAmt(data.total_amount_display || "");
+		const legend = `<table class="mds-mb-legend">
+			<tbody>${rows}</tbody>
+			<tfoot>
+				<tr class="mds-mb-row mds-mb-row--total">
+					<td colspan="2" class="mds-mb-label-cell"><strong>Итого</strong></td>
+					<td class="mds-mb-amount-cell"><strong>${totalAmt}</strong></td>
+					<td class="mds-mb-pct-cell"><span class="mds-mb-badge mds-mb-badge--total">100%</span></td>
+				</tr>
+			</tfoot>
+		</table>`;
+
+		this.$marginBonus.html(`<div class="mds-mb-wrap">${svg}${legend}</div>`);
 	}
 
 	render_delta_badge(value, valueDisplay) {
@@ -373,6 +467,13 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				</div>
 				${this.render_delta_badge(data.cost_change, data.cost_change_display)}
 			</div>
+			<div class="mds-price-row mds-price-row--difference">
+				<div>
+					<span>Разница</span>
+					<strong class="is-difference">${frappe.utils.escape_html(data.difference_price_display || "0 UZS")}</strong>
+				</div>
+				${this.render_delta_badge(data.difference_change, data.difference_change_display)}
+			</div>
 		`);
 	}
 
@@ -403,12 +504,12 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				</div>
 				<div class="mds-health-meta">
 					<div>
-						<span>Долг</span>
-						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
-					</div>
-					<div>
 						<span>Продажи</span>
 						<strong>${frappe.utils.escape_html(data.health_sales_display || "0 UZS")}</strong>
+					</div>
+					<div>
+						<span>Долг</span>
+						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
 					</div>
 				</div>
 			</div>
@@ -425,6 +526,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_balance_details() {
 		const data = this.data?.balance_details || {};
 		const items = data.items || [];
+		const trendSeries = this.data?.balance_trend?.series || [];
 		this.$balanceDetails.html(`
 			<h2>ДЕТАЛИ БАЛАНСА</h2>
 			${items
@@ -434,7 +536,53 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				<span>ОБЩИЙ БАЛАНС</span>
 				<strong>${frappe.utils.escape_html(data.total_balance || "0 UZS")}</strong>
 			</div>
+			${this.render_balance_trend(trendSeries)}
 		`);
+	}
+
+	render_balance_trend(series) {
+		if (!series || !series.length) return "";
+		const maxTotal = Math.max(1, ...series.map((r) => (r.total != null ? Math.abs(r.total) : 0)));
+		const formatFullMoney = (value) => {
+			const amount = Number(value || 0);
+			const rounded = Math.abs(amount - Math.round(amount)) < 0.005 ? Math.round(amount) : Number(amount.toFixed(2));
+			return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(rounded).replace(/,/g, " ")} UZS`;
+		};
+		return `
+			<div class="mds-balance-trend">
+				<div class="mds-balance-trend-title">Динамика общего баланса</div>
+				<div class="mds-balance-trend-bars">
+					${series
+						.map((row) => {
+							if (row.total == null) {
+								return `
+									<div class="mds-bt-item">
+										<div class="mds-bt-bar-shell"></div>
+										<span class="mds-bt-label">${frappe.utils.escape_html(this.monthLabels[row.month] || row.month)}</span>
+									</div>
+								`;
+							}
+							const height = Math.max((Math.abs(row.total) / maxTotal) * 100, 4);
+							const barClass = row.is_up ? "is-up" : "is-down";
+							const pctClass = row.change_pct != null ? (row.change_pct >= 0 ? "is-up" : "is-down") : "";
+							const pctText = row.change_pct_display || "—";
+							return `
+								<div class="mds-bt-item">
+									<div class="mds-bt-bar-shell">
+										<div class="mds-bt-tooltip">
+											<span class="mds-bt-tooltip-sum">${frappe.utils.escape_html(formatFullMoney(row.total))}</span>
+											<span class="mds-bt-tooltip-pct ${pctClass}">${frappe.utils.escape_html(pctText)}</span>
+										</div>
+										<div class="mds-bt-bar ${barClass}" style="height:${height}%"></div>
+									</div>
+									<span class="mds-bt-label">${frappe.utils.escape_html(this.monthLabels[row.month] || row.month)}</span>
+								</div>
+							`;
+						})
+						.join("")}
+				</div>
+			</div>
+		`;
 	}
 
 	render_unit_cost() {

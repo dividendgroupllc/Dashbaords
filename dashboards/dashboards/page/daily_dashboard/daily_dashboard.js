@@ -233,53 +233,63 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 	render_table() {
 		const rows = this.getProductRows();
 		const total = this.buildTotalRow(rows);
-		const headers = ["Товары", "КГ", "Сумма продаж", "Себестоимость", "Маржа", "Сумма РСП", "Рен", "ЧП", "Рен ЧП"];
+		const headers = [
+			{ label: "Товары", className: "is-text" },
+			{ label: "КГ", className: "is-number" },
+			{ label: "Сумма продаж", className: "is-number" },
+			{ label: "Себестоимость", className: "is-number" },
+			{ label: "Маржа", className: "is-number" },
+			{ label: "Бонус", className: "is-number" },
+			{ label: "Рен", className: "is-number" },
+			{ label: "ЧП", className: "is-number" },
+			{ label: "Рен ЧП", className: "is-number" },
+		];
+		const colgroup = `<colgroup><col style="width:28%">${Array(8).fill('<col style="width:9%">').join("")}</colgroup>`;
 
-			this.$table.html(`
-				<div class="daily-dashboard-table-scroll">
-					<table class="daily-dashboard-table">
-						<thead>
-							<tr>${headers.map((header) => `<th>${frappe.utils.escape_html(header)}</th>`).join("")}</tr>
-						</thead>
-						<tbody>
-						${rows
-							.map(
-								(row) => `
-									<tr>
-										<td class="is-text">${frappe.utils.escape_html(row.item)}</td>
-										<td class="is-number">${this.formatInteger(row.kg)}</td>
-										<td class="is-number">${this.formatInteger(row.sales)}</td>
-										<td class="is-number">${this.formatInteger(row.cost)}</td>
-										<td class="is-number">${this.formatInteger(row.margin)}</td>
-										<td class="is-number">${this.formatInteger(row.rsp)}</td>
-										<td class="is-number">${this.formatPercent(row.profitability)}</td>
-										<td class="is-number">${this.formatInteger(row.np)}</td>
-										<td class="is-number">${this.formatSignedPercent(row.np_profitability)}</td>
-									</tr>
-								`
-							)
-							.join("")}
-						</tbody>
-					</table>
-				</div>
-				<div class="daily-dashboard-table-total">
-					<table class="daily-dashboard-table daily-dashboard-table--total">
-						<tfoot>
-							<tr class="is-total">
-								<td class="is-text">Итого</td>
-								<td class="is-number">${this.formatInteger(total.kg)}</td>
-								<td class="is-number">${this.formatInteger(total.sales)}</td>
-								<td class="is-number">${this.formatInteger(total.cost)}</td>
-								<td class="is-number">${this.formatInteger(total.margin)}</td>
-								<td class="is-number">${this.formatInteger(total.rsp)}</td>
-								<td class="is-number">${this.formatPercent(total.profitability)}</td>
-								<td class="is-number">${this.formatInteger(total.np)}</td>
-								<td class="is-number">${this.formatSignedPercent(total.np_profitability)}</td>
-							</tr>
-						</tfoot>
-					</table>
-				</div>
-			`);
+		this.$table.html(`
+			<div class="daily-dashboard-table-scroll">
+				<table class="daily-dashboard-table">
+					${colgroup}
+					<thead>
+						<tr>${headers
+							.map((header) => `<th class="${header.className || ""}">${frappe.utils.escape_html(header.label)}</th>`)
+							.join("")}</tr>
+					</thead>
+					<tbody>
+					${rows
+						.map(
+							(row) => `
+								<tr>
+									<td class="is-text">${frappe.utils.escape_html(row.item)}</td>
+									<td class="is-number">${this.formatInteger(row.kg)}</td>
+									<td class="is-number">${this.formatInteger(row.sales)}</td>
+									<td class="is-number">${this.formatInteger(row.cost)}</td>
+									<td class="is-number">${this.formatInteger(row.margin)}</td>
+									<td class="is-number">${this.formatInteger(row.bonus)}</td>
+									<td class="is-number">${this.formatPercent(row.profitability)}</td>
+									<td class="is-number">${this.formatInteger(row.np)}</td>
+									<td class="is-number">${this.formatSignedPercent(row.np_profitability)}</td>
+								</tr>
+							`
+						)
+						.join("")}
+					</tbody>
+					<tfoot>
+						<tr class="is-total">
+							<td class="is-text">Итого</td>
+							<td class="is-number">${this.formatInteger(total.kg)}</td>
+							<td class="is-number">${this.formatInteger(total.sales)}</td>
+							<td class="is-number">${this.formatInteger(total.cost)}</td>
+							<td class="is-number">${this.formatInteger(total.margin)}</td>
+							<td class="is-number">${this.formatInteger(total.bonus)}</td>
+							<td class="is-number">${this.formatPercent(total.profitability)}</td>
+							<td class="is-number">${this.formatInteger(total.np)}</td>
+							<td class="is-number">${this.formatSignedPercent(total.np_profitability)}</td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
 	}
 
 	sync_panel_heights() {
@@ -323,11 +333,11 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 				accumulator.sales += row.sales;
 				accumulator.cost += row.cost;
 				accumulator.margin += row.margin;
-				accumulator.rsp += row.rsp;
+				accumulator.bonus += row.bonus;
 				accumulator.np += row.np;
 				return accumulator;
 			},
-			{ kg: 0, sales: 0, cost: 0, margin: 0, rsp: 0, np: 0 }
+			{ kg: 0, sales: 0, cost: 0, margin: 0, bonus: 0, np: 0 }
 		);
 
 		total.profitability = total.sales ? (total.margin / total.sales) * 100 : 0;

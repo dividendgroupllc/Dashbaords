@@ -11,6 +11,7 @@ from dashboards.dashboards.dashboard_data import (
 	convert_company_currency_amount,
 	convert_to_reporting_currency,
 	get_cogs_total,
+	get_item_bonus_map,
 )
 
 
@@ -200,8 +201,7 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 			si.company,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
 			SUM(COALESCE(sii.net_amount, sii.amount, sii.base_net_amount, sii.base_amount, 0)) AS sales,
-			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost,
-			SUM(COALESCE(sii.discount_amount, 0) + COALESCE(sii.distributed_discount_amount, 0)) AS rsp
+			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
@@ -232,17 +232,16 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 				"kg": 0.0,
 				"sales": 0.0,
 				"cost": 0.0,
-				"rsp": 0.0,
 			},
 		)
 		existing["kg"] += flt(row.kg)
 		existing["sales"] += sales
 		existing["cost"] += flt(row.cost)
-		existing["rsp"] += flt(row.rsp)
 
 	values = sorted(grouped.values(), key=lambda row: flt(row["sales"]), reverse=True)
 	total_sales = sum(flt(row["sales"]) for row in values)
 	total_cost = sum(flt(row["cost"]) for row in values)
+	item_bonus_map = get_item_bonus_map(year, MONTH_MAP[month]) if values else {}
 	item_cogs_map = _get_filtered_item_cogs_map(year, month, client, day) if not total_cost else {}
 	period_cogs_total = flt(get_cogs_total(year, MONTH_MAP[month])) if not total_cost and total_sales and not client and not day else 0
 
@@ -255,8 +254,8 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 		if not cost and period_cogs_total:
 			cost = period_cogs_total * sales / total_sales
 		margin = sales - cost
-		rsp = flt(row["rsp"])
-		np = margin - rsp
+		bonus = flt(item_bonus_map.get(row["item_key"]))
+		np = margin - bonus
 		result.append(
 			{
 				"item": row["item"],
@@ -264,7 +263,7 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 				"sales": round(sales),
 				"cost": round(cost),
 				"margin": round(margin),
-				"rsp": round(rsp),
+				"bonus": round(bonus),
 				"profitability": (margin / sales * 100) if sales else 0,
 				"np": round(np),
 				"np_profitability": (np / sales * 100) if sales else 0,

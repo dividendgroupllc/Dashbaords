@@ -179,7 +179,7 @@
 
 .daily-dashboard-content {
 	display: grid;
-	grid-template-columns: 297px minmax(0, 1fr);
+	grid-template-columns: 330px minmax(0, 1fr);
 	gap: 14px;
 	padding: 0 6px 10px;
 	align-items: start;
@@ -321,12 +321,6 @@
 	min-height: 0;
 }
 
-.daily-dashboard-table-total {
-	flex: 0 0 auto;
-	border-top: 1px solid #cfd6df;
-	background: #eef3f8;
-}
-
 .daily-dashboard-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -344,6 +338,8 @@
 	font-weight: 600;
 	text-align: left;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	background: #fbfbfc;
 }
 
@@ -355,6 +351,9 @@
 }
 
 .daily-dashboard-table tfoot td {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
 	padding: 4px 6px;
 	border-top: 2px solid #939393;
 	background: #eef3f8;
@@ -367,9 +366,19 @@
 	text-align: right;
 }
 
+.daily-dashboard-table th.is-text,
+.daily-dashboard-table td.is-text {
+	text-align: left;
+}
+
 .daily-dashboard-table th:first-child,
 .daily-dashboard-table td:first-child {
 	width: 28%;
+}
+
+.daily-dashboard-table th:not(.is-text),
+.daily-dashboard-table td:not(.is-text) {
+	font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1200px) {

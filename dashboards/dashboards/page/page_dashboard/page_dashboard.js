@@ -183,13 +183,13 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.render_table(
 			"product-margin",
 			this.context.product_margin_rows || [],
-			["Товары", "Тонна", "Сумма продаж", "RCP сумма", "Маржа", "Рен"],
+			["Товары", "Тонна", "Сумма продаж", "Сумма себ", "Маржа", "RCP сумма", "%", "Маржа нет", "Рен"],
 			this.context.product_margin_title || null
 		);
 		this.render_table(
 			"kpi-client-monthly",
 			this.context.kpi_client_rows || [],
-			["Клиент", "Продажа", "Сб.ст", "КГ", "Возврат", "Маржа", "%", "Бонус", "Скидка", "Маржа нет", "PnL"],
+			["Клиент", "Продажа", "Сб.ст", "КГ", "Маржа", "Бонус", "%", "Маржа нет", "Рен"],
 			this.context.kpi_client_title || null
 		);
 		this.render_table(
@@ -251,9 +251,9 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 
 	getTableColumnWidths(key, columnCount) {
 		const widthMap = {
-			"product-margin": ["32%", "12%", "18%", "14%", "14%", "10%"],
+			"product-margin": ["22%", "8%", "13%", "11%", "11%", "10%", "6%", "12%", "7%"],
 			"client-kpi": ["34%", "16%", "32%", "18%"],
-			"kpi-client-monthly": ["18%", "9%", "9%", "7%", "9%", "9%", "6%", "9%", "8%", "10%", "6%"],
+			"kpi-client-monthly": ["22%", "10%", "10%", "8%", "10%", "10%", "8%", "12%", "10%"],
 			"regional-summary": ["34%", "22%", "26%", "18%"],
 		};
 
@@ -445,6 +445,26 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		return this.regionPalette[(index >= 0 ? index : 0) % this.regionPalette.length];
 	}
 
+	positionMapTooltip($canvas, $tooltip, event) {
+		const canvasOffset = $canvas.offset() || { left: 0, top: 0 };
+		const canvasWidth = $canvas.innerWidth() || 0;
+		const canvasHeight = $canvas.innerHeight() || 0;
+		const tooltipWidth = $tooltip.outerWidth() || 160;
+		const tooltipHeight = $tooltip.outerHeight() || 80;
+		const gap = 14;
+		const padding = 8;
+		const cursorX = event.pageX - canvasOffset.left;
+		const cursorY = event.pageY - canvasOffset.top;
+		const showOnLeft = cursorX > canvasWidth / 2;
+		const preferredLeft = showOnLeft ? cursorX - tooltipWidth - gap : cursorX + gap;
+		const maxLeft = Math.max(padding, canvasWidth - tooltipWidth - padding);
+		const maxTop = Math.max(padding, canvasHeight - tooltipHeight - padding);
+		const left = Math.min(Math.max(preferredLeft, padding), maxLeft);
+		const top = Math.min(Math.max(cursorY - tooltipHeight / 2, padding), maxTop);
+
+		$tooltip.css({ left: `${left}px`, top: `${top}px` });
+	}
+
 	render_region_map($slot, rows) {
 		$slot.html(`
 			<div class="dashboard-page-map-card">
@@ -527,12 +547,10 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 							<div>AKB: ${frappe.utils.escape_html(this.formatInteger((row || {}).akb || 0))}</div>
 						`);
 						$tooltip.addClass("is-visible");
-						const offset = $slot.offset() || { left: 0, top: 0 };
-						$tooltip.css({ left: `${event.pageX - offset.left + 16}px`, top: `${event.pageY - offset.top - 12}px` });
+						this.positionMapTooltip($canvas, $tooltip, event);
 					});
 					group.addEventListener("mousemove", (event) => {
-						const offset = $slot.offset() || { left: 0, top: 0 };
-						$tooltip.css({ left: `${event.pageX - offset.left + 16}px`, top: `${event.pageY - offset.top - 12}px` });
+						this.positionMapTooltip($canvas, $tooltip, event);
 					});
 					group.addEventListener("mouseleave", () => {
 						$tooltip.removeClass("is-visible");

@@ -261,10 +261,7 @@ def _get_monthly_return_metrics(year: str) -> dict[int, dict[str, float]]:
 
 
 def _to_tons(quantity: float) -> float:
-    quantity_value = flt(quantity)
-    if abs(quantity_value) >= 1000:
-        return quantity_value / 1000
-    return quantity_value
+    return flt(quantity) / 1000
 
 
 def _get_sales_volume_data(year: str) -> dict[str, Any]:
@@ -278,7 +275,7 @@ def _get_sales_volume_data(year: str) -> dict[str, Any]:
             {
                 "month": month_label,
                 "tons": round(tons, 2),
-                "tons_display": f"{round(tons, 1):g}t" if tons else "",
+                "tons_display": f"{tons:.2f}t" if tons else "",
                 "amount": amount,
                 "amount_display": _compact_number(amount) if amount else "",
             }

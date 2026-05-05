@@ -199,6 +199,7 @@
 }
 
 .dashboard-page-table-slot[data-table="product-margin"] {
+	position: relative;
 	max-height: 494px;
 	overflow-y: auto;
 	overflow-x: auto;
@@ -304,10 +305,11 @@
 
 .dashboard-page-table-slot[data-table="product-margin"] .dashboard-page-table tbody tr.is-total td {
 	position: sticky;
-	bottom: 0;
-	z-index: 1;
+	bottom: -2px;
+	z-index: 2;
 	background: #f2f2f3;
 	border-top: 2px solid #d1d6dc;
+	box-shadow: 0 -8px 0 #f2f2f3, 0 2px 0 #f2f2f3;
 }
 
 .dashboard-page-table-slot[data-table="kpi-client-monthly"] .dashboard-page-table tbody tr.is-total td {

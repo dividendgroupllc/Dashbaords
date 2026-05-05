@@ -905,8 +905,8 @@ def get_rcp_totals(year: str | int | None, month: str | int | None = None) -> di
     direct_total = _get_expense_total_by_root(
         year,
         month,
-        ["Direct Expenses"],
-        exclude_account_patterns=["Stock Expenses", "Cost of Goods Sold", "Stock Adjustment"],
+        ["Direct Expenses", "Direct Expense", "Direct Expence"],
+        exclude_account_patterns=["Cost of Goods Sold"],
     )
     indirect_total = _get_expense_total_by_root(year, month, ["Indirect Expenses"])
     return {
@@ -1088,6 +1088,101 @@ def get_item_rcp_map(year: str | int | None, month: str | int | None = None) -> 
         )
 
     return item_rcp_map
+
+
+def get_item_bonus_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+    if not year:
+        return {}
+
+    month_no = _month_number(month)
+    month_filter_sales = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            sii.parent AS invoice_name,
+            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
+            si.posting_date,
+            si.company,
+            si.currency,
+            SUM(COALESCE(sii.net_amount, sii.amount, sii.base_net_amount, sii.base_amount, 0)) AS item_sales,
+            SUM(
+                CASE
+                    WHEN COALESCE(sii.is_free_item, 0) = 1
+                        THEN COALESCE(sii.price_list_rate, 0) * COALESCE(sii.qty, 0)
+                    ELSE 0
+                END
+            ) AS free_bonus
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
+          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
+          {month_filter_sales}
+        GROUP BY sii.parent, COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар'), si.posting_date, si.company, si.currency
+        """,
+        as_dict=True,
+    )
+
+    item_rows: dict[str, list[dict[str, Any]]] = {}
+    invoice_totals: dict[str, float] = {}
+    invoice_context: dict[str, dict[str, Any]] = {}
+
+    for row in rows:
+        invoice_name = str(row.invoice_name or "")
+        item_sales = flt(row.item_sales)
+        item_rows.setdefault(invoice_name, []).append(
+            {
+                "item_key": row.item_key,
+                "item_sales": item_sales,
+                "free_bonus": flt(row.free_bonus),
+                "posting_date": row.posting_date,
+                "company": row.company,
+                "currency": row.currency,
+            }
+        )
+        invoice_totals[invoice_name] = invoice_totals.get(invoice_name, 0) + item_sales
+        invoice_context[invoice_name] = {
+            "posting_date": row.posting_date,
+            "company": row.company,
+            "currency": row.currency,
+        }
+
+    loyalty_rows = frappe.db.sql(
+        f"""
+        SELECT
+            name AS invoice_name,
+            posting_date,
+            company,
+            currency,
+            SUM(COALESCE(loyalty_amount, 0)) AS loyalty_bonus
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND COALESCE(is_return, 0) = 0
+          AND YEAR(posting_date) = {frappe.db.escape(year)}
+          {month_filter_sales.replace("si.", "")}
+        GROUP BY name, posting_date, company, currency
+        """,
+        as_dict=True,
+    )
+
+    loyalty_by_invoice: dict[str, float] = {}
+    for row in loyalty_rows:
+        loyalty_by_invoice[str(row.invoice_name or "")] = convert_to_reporting_currency(
+            row.loyalty_bonus, row.currency, row.posting_date, row.company
+        )
+
+    bonus_map: dict[str, float] = {}
+    for invoice_name, items in item_rows.items():
+        invoice_total = flt(invoice_totals.get(invoice_name))
+        loyalty_bonus = flt(loyalty_by_invoice.get(invoice_name))
+        for item in items:
+            item_bonus = convert_to_reporting_currency(item["free_bonus"], item["currency"], item["posting_date"], item["company"])
+            if invoice_total and loyalty_bonus:
+                item_bonus += loyalty_bonus * flt(item["item_sales"]) / invoice_total
+            bonus_map[item["item_key"]] = bonus_map.get(item["item_key"], 0) + item_bonus
+
+    return bonus_map
 
 
 def get_reference_month_date():

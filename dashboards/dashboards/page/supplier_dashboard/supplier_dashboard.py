@@ -100,115 +100,127 @@ def _get_period_range(year: str, month: str | None) -> tuple[str, str, str]:
 	return f"{year}-01-01", f"{year}-12-31", year
 
 
-def _supplier_filter_clause(supplier: str | None, params: dict[str, Any], alias: str) -> str:
-	if not supplier:
+def _party_dashboard_config(view: str) -> dict[str, str]:
+	if view == "client":
+		return {
+			"party_type": "Customer",
+			"party_field": "customer",
+			"payment_party_field": "party",
+			"name_field": "customer_name",
+			"party_title": "Клиент",
+			"party_title_plural": "Клиенты",
+			"invoice_label": "Продажа",
+			"invoice_table": "tabSales Invoice",
+			"invoice_item_table": "tabSales Invoice Item",
+			"payment_amount_field": "paid_amount",
+			"payment_currency_field": "paid_from_account_currency",
+			"payment_account_field": "paid_to",
+			"payment_type": "Receive",
+			"payment_party_table": "tabCustomer",
+			"payment_party_name_field": "customer_name",
+			"unknown_party": "Неизвестный клиент",
+		}
+
+	return {
+		"party_type": "Supplier",
+		"party_field": "supplier",
+		"payment_party_field": "party",
+		"name_field": "supplier_name",
+		"party_title": "Поставщик",
+		"party_title_plural": "Поставщики",
+		"invoice_label": "Приход",
+		"invoice_table": "tabPurchase Invoice",
+		"invoice_item_table": "tabPurchase Invoice Item",
+		"payment_amount_field": "received_amount",
+		"payment_currency_field": "paid_to_account_currency",
+		"payment_account_field": "paid_from",
+		"payment_type": "Pay",
+		"payment_party_table": "tabSupplier",
+		"payment_party_name_field": "supplier_name",
+		"unknown_party": "Неизвестный поставщик",
+	}
+
+
+def _party_filter_clause(view: str, party: str | None, params: dict[str, Any], alias: str) -> str:
+	if not party:
 		return ""
-	params["supplier"] = supplier
-	field = "supplier" if alias == "pi" else "party"
-	return f" AND {alias}.{field} = %(supplier)s"
+	config = _party_dashboard_config(view)
+	params["party"] = party
+	field = config["payment_party_field"] if alias == "pe" else config["party_field"]
+	return f" AND {alias}.{field} = %(party)s"
 
 
-def _get_supplier_invoice_rows(start_date: str, end_date: str, supplier: str | None = None) -> list[dict[str, Any]]:
+def _get_party_invoice_rows(view: str, start_date: str, end_date: str, party: str | None = None) -> list[dict[str, Any]]:
+	config = _party_dashboard_config(view)
 	params = {"start_date": start_date, "end_date": end_date}
-	supplier_clause = _supplier_filter_clause(supplier, params, "pi")
+	party_clause = _party_filter_clause(view, party, params, "doc")
+
 	return frappe.db.sql(
 		f"""
 		SELECT
-			pi.supplier,
-			COALESCE(NULLIF(pi.supplier_name, ''), pi.supplier) AS supplier_name,
-			pi.posting_date,
-			pi.currency,
-			pi.company,
-			SUM(CASE WHEN pi.posting_date < %(start_date)s
-				THEN COALESCE(pi.grand_total, 0) ELSE 0 END) AS opening_amount,
-			SUM(CASE WHEN pi.posting_date BETWEEN %(start_date)s AND %(end_date)s
-				THEN COALESCE(pi.grand_total, 0) ELSE 0 END) AS inflow_amount
-		FROM `tabPurchase Invoice` pi
-		WHERE pi.docstatus = 1
-		  AND COALESCE(pi.is_return, 0) = 0
-		  {supplier_clause}
-		GROUP BY pi.supplier, supplier_name, pi.posting_date, pi.currency, pi.company
+			doc.{config['party_field']} AS party,
+			COALESCE(NULLIF(doc.{config['name_field']}, ''), doc.{config['party_field']}, '{config['party_title_plural']}') AS party_name,
+			doc.posting_date,
+			doc.currency,
+			doc.company,
+			SUM(CASE WHEN doc.posting_date < %(start_date)s THEN COALESCE(doc.grand_total, 0) ELSE 0 END) AS opening_amount,
+			SUM(CASE WHEN doc.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN COALESCE(doc.grand_total, 0) ELSE 0 END) AS inflow_amount,
+			SUM(CASE WHEN doc.posting_date < %(start_date)s THEN COALESCE(item.stock_qty, item.qty, 0) ELSE 0 END) AS opening_kg,
+			SUM(CASE WHEN doc.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN COALESCE(item.stock_qty, item.qty, 0) ELSE 0 END) AS inflow_kg
+		FROM `{config['invoice_table']}` doc
+		INNER JOIN `{config['invoice_item_table']}` item ON item.parent = doc.name
+		WHERE doc.docstatus = 1
+		  AND COALESCE(doc.is_return, 0) = 0
+		  {party_clause}
+		GROUP BY doc.{config['party_field']}, party_name, doc.posting_date, doc.currency, doc.company
 		""",
 		params,
 		as_dict=True,
 	)
 
 
-def _get_supplier_payment_rows(start_date: str, end_date: str, supplier: str | None = None) -> list[dict[str, Any]]:
+def _get_party_payment_rows(view: str, start_date: str, end_date: str, party: str | None = None) -> list[dict[str, Any]]:
+	config = _party_dashboard_config(view)
 	params = {"start_date": start_date, "end_date": end_date}
-	supplier_clause = _supplier_filter_clause(supplier, params, "pe")
+	party_clause = _party_filter_clause(view, party, params, "pe")
+
 	return frappe.db.sql(
 		f"""
 		SELECT
-			pe.party AS supplier,
-			COALESCE(NULLIF(sup.supplier_name, ''), pe.party) AS supplier_name,
+			pe.party AS party,
+			COALESCE(NULLIF(party.{config['payment_party_name_field']}, ''), pe.party, '{config['unknown_party']}') AS party_name,
 			pe.posting_date,
+			pe.{config['payment_currency_field']} AS currency,
 			pe.company,
 			SUM(CASE WHEN pe.posting_date < %(start_date)s AND acc.account_type = 'Cash'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_cash_amount,
+				THEN COALESCE(pe.{config['payment_amount_field']}, 0) ELSE 0 END) AS opening_cash_amount,
 			SUM(CASE WHEN pe.posting_date < %(start_date)s AND acc.account_type = 'Bank'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS opening_bank_amount,
+				THEN COALESCE(pe.{config['payment_amount_field']}, 0) ELSE 0 END) AS opening_bank_amount,
 			SUM(CASE WHEN pe.posting_date BETWEEN %(start_date)s AND %(end_date)s AND acc.account_type = 'Cash'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS cash_payment_amount,
+				THEN COALESCE(pe.{config['payment_amount_field']}, 0) ELSE 0 END) AS cash_payment_amount,
 			SUM(CASE WHEN pe.posting_date BETWEEN %(start_date)s AND %(end_date)s AND acc.account_type = 'Bank'
-				THEN COALESCE(pe.base_received_amount, pe.base_paid_amount, 0) ELSE 0 END) AS bank_payment_amount
+				THEN COALESCE(pe.{config['payment_amount_field']}, 0) ELSE 0 END) AS bank_payment_amount
 		FROM `tabPayment Entry` pe
-		LEFT JOIN `tabSupplier` sup ON sup.name = pe.party
-		LEFT JOIN `tabAccount` acc ON acc.name = pe.paid_from
+		LEFT JOIN `{config['payment_party_table']}` party ON party.name = pe.party
+		LEFT JOIN `tabAccount` acc ON acc.name = pe.{config['payment_account_field']}
 		WHERE pe.docstatus = 1
-		  AND pe.payment_type = 'Pay'
-		  AND pe.party_type = 'Supplier'
+		  AND pe.payment_type = %(payment_type)s
+		  AND pe.party_type = %(party_type)s
 		  AND pe.party IS NOT NULL
-		  {supplier_clause}
-		GROUP BY pe.party, supplier_name, pe.posting_date, pe.company
+		  {party_clause}
+		GROUP BY pe.party, party_name, pe.posting_date, pe.{config['payment_currency_field']}, pe.company
 		""",
-		params,
+		{
+			**params,
+			"party_type": config["party_type"],
+			"payment_type": config["payment_type"],
+		},
 		as_dict=True,
 	)
 
 
-def _build_supplier_rows(start_date: str, end_date: str, supplier: str | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-	suppliers: dict[str, dict[str, Any]] = {}
-
-	for row in _get_supplier_invoice_rows(start_date, end_date, supplier=supplier):
-		key = row.supplier
-		entry = suppliers.setdefault(
-			key,
-			{
-				"supplier": row.supplier,
-				"supplier_name": row.supplier_name,
-				"opening_base": 0.0,
-				"inflow_base": 0.0,
-				"cash_payment_base": 0.0,
-				"bank_payment_base": 0.0,
-			},
-		)
-		entry.update({"supplier": row.supplier, "supplier_name": row.supplier_name})
-		entry["opening_base"] += convert_to_reporting_currency(row.opening_amount, row.currency, row.posting_date, row.company)
-		entry["inflow_base"] += convert_to_reporting_currency(row.inflow_amount, row.currency, row.posting_date, row.company)
-
-	for row in _get_supplier_payment_rows(start_date, end_date, supplier=supplier):
-		key = row.supplier
-		entry = suppliers.setdefault(
-			key,
-			{
-				"supplier": row.supplier,
-				"supplier_name": row.supplier_name,
-				"opening_base": 0.0,
-				"inflow_base": 0.0,
-				"cash_payment_base": 0.0,
-				"bank_payment_base": 0.0,
-			},
-		)
-		entry["cash_payment_base"] += convert_company_currency_amount(row.cash_payment_amount, row.posting_date, row.company)
-		entry["bank_payment_base"] += convert_company_currency_amount(row.bank_payment_amount, row.posting_date, row.company)
-		entry["opening_base"] -= convert_company_currency_amount(
-			flt(row.opening_cash_amount) + flt(row.opening_bank_amount),
-			row.posting_date,
-			row.company,
-		)
-
-	rows = []
+def _build_party_rows(view: str, start_date: str, end_date: str, party: str | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+	rows_by_key: dict[tuple[str, str], dict[str, Any]] = {}
 	totals = {
 		"opening": 0.0,
 		"inflow": 0.0,
@@ -217,25 +229,80 @@ def _build_supplier_rows(start_date: str, end_date: str, supplier: str | None = 
 		"sum_balance": 0.0,
 		"sum_prepayment": 0.0,
 		"sum_debt": 0.0,
+		"kg": 0.0,
 	}
 
-	for value in suppliers.values():
-		balance_base = (
-			value["opening_base"]
-			+ value["inflow_base"]
-			- value["cash_payment_base"]
-			- value["bank_payment_base"]
+	for row in _get_party_invoice_rows(view, start_date, end_date, party=party):
+		key = (str(row.party), str(row.currency or "UZS"))
+		entry = rows_by_key.setdefault(
+			key,
+			{
+				"party": row.party,
+				"party_name": row.party_name,
+				"currency": row.currency or "UZS",
+				"opening": 0.0,
+				"inflow": 0.0,
+				"kg": 0.0,
+				"cash_payment": 0.0,
+				"bank_payment": 0.0,
+				"opening_base": 0.0,
+				"inflow_base": 0.0,
+				"cash_payment_base": 0.0,
+				"bank_payment_base": 0.0,
+			},
 		)
-		rentability = (balance_base / value["inflow_base"] * 100) if value["inflow_base"] else 0.0
+		entry["party_name"] = row.party_name
+		entry["opening"] += flt(row.opening_amount)
+		entry["inflow"] += flt(row.inflow_amount)
+		entry["kg"] += flt(row.inflow_kg)
+		entry["opening_base"] += convert_to_reporting_currency(row.opening_amount, row.currency, row.posting_date, row.company)
+		entry["inflow_base"] += convert_to_reporting_currency(row.inflow_amount, row.currency, row.posting_date, row.company)
+
+	for row in _get_party_payment_rows(view, start_date, end_date, party=party):
+		key = (str(row.party), str(row.currency or "UZS"))
+		entry = rows_by_key.setdefault(
+			key,
+			{
+				"party": row.party,
+				"party_name": row.party_name,
+				"currency": row.currency or "UZS",
+				"opening": 0.0,
+				"inflow": 0.0,
+				"kg": 0.0,
+				"cash_payment": 0.0,
+				"bank_payment": 0.0,
+				"opening_base": 0.0,
+				"inflow_base": 0.0,
+				"cash_payment_base": 0.0,
+				"bank_payment_base": 0.0,
+			},
+		)
+		entry["party_name"] = row.party_name
+		opening_payment = flt(row.opening_cash_amount) + flt(row.opening_bank_amount)
+		period_cash = flt(row.cash_payment_amount)
+		period_bank = flt(row.bank_payment_amount)
+
+		entry["opening"] -= opening_payment
+		entry["cash_payment"] += period_cash
+		entry["bank_payment"] += period_bank
+		entry["opening_base"] -= convert_to_reporting_currency(opening_payment, row.currency, row.posting_date, row.company)
+		entry["cash_payment_base"] += convert_to_reporting_currency(period_cash, row.currency, row.posting_date, row.company)
+		entry["bank_payment_base"] += convert_to_reporting_currency(period_bank, row.currency, row.posting_date, row.company)
+
+	rows = []
+	for value in rows_by_key.values():
+		balance = value["opening"] + value["inflow"] - value["cash_payment"] - value["bank_payment"]
+		balance_base = value["opening_base"] + value["inflow_base"] - value["cash_payment_base"] - value["bank_payment_base"]
 
 		if not any(
 			flt(number)
 			for number in (
-				value["opening_base"],
-				value["inflow_base"],
-				value["cash_payment_base"],
-				value["bank_payment_base"],
-				balance_base,
+				value["opening"],
+				value["inflow"],
+				value["cash_payment"],
+				value["bank_payment"],
+				value["kg"],
+				balance,
 			)
 		):
 			continue
@@ -245,6 +312,7 @@ def _build_supplier_rows(start_date: str, end_date: str, supplier: str | None = 
 		totals["cash_payment"] += value["cash_payment_base"]
 		totals["bank_payment"] += value["bank_payment_base"]
 		totals["sum_balance"] += balance_base
+		totals["kg"] += value["kg"]
 
 		if balance_base < 0:
 			totals["sum_prepayment"] += abs(balance_base)
@@ -253,29 +321,32 @@ def _build_supplier_rows(start_date: str, end_date: str, supplier: str | None = 
 
 		rows.append(
 			{
-				"supplier": value["supplier"],
-				"supplier_name": value["supplier_name"],
-				"opening": round(value["opening_base"]),
-				"inflow": round(value["inflow_base"]),
-				"cash_payment": round(value["cash_payment_base"]),
-				"bank_payment": round(value["bank_payment_base"]),
-				"sum_balance": round(balance_base),
-				"rentability": rentability,
+				"party": value["party"],
+				"party_name": value["party_name"],
+				"currency": value["currency"],
+				"opening": round(value["opening"]),
+				"inflow": round(value["inflow"]),
+				"kg": round(value["kg"], 2),
+				"cash_payment": round(value["cash_payment"]),
+				"bank_payment": round(value["bank_payment"]),
+				"sum_balance": round(balance),
 			}
 		)
 
-	rows.sort(key=lambda row: (row["sum_balance"] >= 0, row["sum_balance"], row["supplier_name"]))
+	rows.sort(key=lambda row: (row["sum_balance"] >= 0, row["sum_balance"], row["party_name"]))
 
-	return rows, {key: round(value) for key, value in totals.items()}
+	return rows, {key: round(value, 2) if key == "kg" else round(value) for key, value in totals.items()}
 
 
 @frappe.whitelist()
-def get_dashboard_context(year: str | None = None, month: str | None = None, supplier: str | None = None):
+def get_dashboard_context(year: str | None = None, month: str | None = None, view: str | None = None, party: str | None = None):
 	company_name, company_currency = _get_company_details()
 	selected_year, selected_month = _normalize_filters(year, month)
 	start_date, end_date, period_label = _get_period_range(selected_year, selected_month)
-	rows, totals = _build_supplier_rows(start_date, end_date, supplier=supplier)
-	selected_supplier_name = next((row["supplier_name"] for row in rows if row["supplier"] == supplier), None) if supplier else None
+	selected_view = view if view in {"client", "supplier"} else "supplier"
+	config = _party_dashboard_config(selected_view)
+	rows, totals = _build_party_rows(selected_view, start_date, end_date, party=party)
+	selected_party_name = next((row["party_name"] for row in rows if row["party"] == party), None) if party else None
 
 	return {
 		"company_name": company_name,
@@ -283,14 +354,23 @@ def get_dashboard_context(year: str | None = None, month: str | None = None, sup
 		"period_label": period_label,
 		"years": _get_years(),
 		"months": MONTH_LABELS,
+		"view": selected_view,
+		"view_label": config["party_title_plural"],
 		"default_filters": {
 			"year": selected_year,
 			"month": selected_month,
-			"supplier": supplier,
+			"view": selected_view,
+			"party": party,
 		},
-		"selected_supplier_name": selected_supplier_name,
+		"selected_party_name": selected_party_name,
 		"columns": {
-			"local_balance_label": "Сум остаток",
+			"party_label": config["party_title"],
+			"inflow_label": config["invoice_label"],
+			"currency_label": "Валюта",
+			"kg_label": "KG",
+			"cash_payment_label": "Оплата наличными",
+			"bank_payment_label": "Оплата банком",
+			"balance_label": "Сум остаток",
 		},
 		"kpis": {
 			"sum_prepayment": totals["sum_prepayment"],

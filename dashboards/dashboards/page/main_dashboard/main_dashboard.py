@@ -11,6 +11,7 @@ from dashboards.dashboards.dashboard_data import (
     convert_company_currency_amount,
     convert_to_reporting_currency,
     format_number,
+    get_gl_accounts_period_total,
     get_cash_total,
     get_cogs_total,
     get_creditor_total,
@@ -261,10 +262,7 @@ def _get_monthly_return_metrics(year: str) -> dict[int, dict[str, float]]:
 
 
 def _to_tons(quantity: float) -> float:
-    quantity_value = flt(quantity)
-    if abs(quantity_value) >= 1000:
-        return quantity_value / 1000
-    return quantity_value
+    return flt(quantity) / 1000
 
 
 def _get_sales_volume_data(year: str) -> dict[str, Any]:
@@ -278,7 +276,7 @@ def _get_sales_volume_data(year: str) -> dict[str, Any]:
             {
                 "month": month_label,
                 "tons": round(tons, 2),
-                "tons_display": f"{round(tons, 1):g}t" if tons else "",
+                "tons_display": f"{tons:.2f}t" if tons else "",
                 "amount": amount,
                 "amount_display": _compact_number(amount) if amount else "",
             }
@@ -455,14 +453,21 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     totals = _get_period_totals(year, month)
     gross_margin_value = flt(totals["sales_amount"]) - flt(totals["cost_amount"])
     bonus_value = flt(totals["bonus_total"]) + flt(totals["loyalty_bonus"])
-    marketing_value = flt(get_rcp_totals(year, _month_no(month))["indirect_total"])
+    from_date, to_date = _get_period_window(year, month)
+    marketing_value = abs(flt(get_gl_accounts_period_total(
+        ["5213 - Маркетинг харажати - P"], from_date, to_date
+    )))
     net_profit_value = flt(get_monthly_net_profit_from_profit_and_loss(year).get(_month_no(month) or 0))
     margin_value = max(gross_margin_value - bonus_value - marketing_value - net_profit_value, 0)
-    denominator = margin_value + bonus_value + marketing_value + net_profit_value
-    margin_percent = round(_safe_div(margin_value * 100, denominator), 1) if denominator else 0
-    bonus_percent = round(_safe_div(bonus_value * 100, denominator), 1) if denominator else 0
-    marketing_percent = round(_safe_div(marketing_value * 100, denominator), 1) if denominator else 0
-    net_profit_percent = round(_safe_div(net_profit_value * 100, denominator), 1) if denominator else 0
+    # Use absolute sum as denominator so chart always renders when any value is non-zero.
+    # The signed sum (margin+bonus+marketing+net_profit) can equal zero when net_profit is
+    # negative and cancels the positive values — causing all percentages to show 0.
+    abs_denominator = margin_value + bonus_value + marketing_value + abs(net_profit_value)
+    margin_percent = round(_safe_div(margin_value * 100, abs_denominator), 1) if abs_denominator else 0
+    bonus_percent = round(_safe_div(bonus_value * 100, abs_denominator), 1) if abs_denominator else 0
+    marketing_percent = round(_safe_div(marketing_value * 100, abs_denominator), 1) if abs_denominator else 0
+    net_profit_percent = round(_safe_div(net_profit_value * 100, abs_denominator), 1) if abs_denominator else 0
+    display_denominator = margin_value + bonus_value + marketing_value + net_profit_value
     return {
         "gross_margin_value": gross_margin_value,
         "margin_value": margin_value,
@@ -473,12 +478,21 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
         "bonus_percent": bonus_percent,
         "marketing_percent": marketing_percent,
         "net_profit_percent": net_profit_percent,
+        "margin_amount_display": f"{_compact_money_label(margin_value)} UZS",
+        "bonus_amount_display": f"{_compact_money_label(bonus_value)} UZS",
+        "marketing_amount_display": f"{_compact_money_label(marketing_value)} UZS",
+        "net_profit_amount_display": f"{_compact_money_label(net_profit_value)} UZS",
+        "margin_percent_display": f"{margin_percent:.1f}%",
+        "bonus_percent_display": f"{bonus_percent:.1f}%",
+        "marketing_percent_display": f"{marketing_percent:.1f}%",
+        "net_profit_percent_display": f"{net_profit_percent:.1f}%",
         "center_value": f"{int(round(net_profit_percent))}%",
         "center_label": "Чистая прибыль",
         "margin_display": f"Маржа ({margin_percent:g}%)",
         "bonus_display": f"Бонус ({bonus_percent:g}%)",
         "marketing_display": f"Маркетинг ({marketing_percent:g}%)",
         "net_profit_display": f"Чистая прибыль ({net_profit_percent:g}%)",
+        "total_amount_display": f"{_compact_money_label(display_denominator)} UZS",
     }
 
 
@@ -509,8 +523,11 @@ def _get_average_check_data(year: str, month: str) -> dict[str, Any]:
     previous_sales_price = _safe_div(previous_totals["sales_amount"], previous_qty)
     previous_cost_price = _safe_div(previous_cost_amount, previous_qty)
 
+    current_difference = current_sales_price - current_cost_price
+    previous_difference = previous_sales_price - previous_cost_price
     sales_change = _safe_div((current_sales_price - previous_sales_price) * 100, previous_sales_price)
     cost_change = _safe_div((current_cost_price - previous_cost_price) * 100, previous_cost_price)
+    difference_change = _safe_div((current_difference - previous_difference) * 100, previous_difference) if previous_difference else 0
 
     return {
         "selling_price": current_sales_price,
@@ -521,6 +538,10 @@ def _get_average_check_data(year: str, month: str) -> dict[str, Any]:
         "cost_price_display": _format_uzs(current_cost_price),
         "cost_change": cost_change,
         "cost_change_display": _format_percent(cost_change),
+        "difference_price": current_difference,
+        "difference_price_display": _format_uzs(current_difference),
+        "difference_change": difference_change,
+        "difference_change_display": _format_percent(difference_change),
         "health_ratio": health_ratio,
         "health_ratio_display": _format_percent(health_ratio),
         "health_ratio_capped": health_ratio_capped,
@@ -724,6 +745,53 @@ def _top_party_breakdown_rows(rows: dict[str, float], empty_label: str) -> list[
     ]
 
 
+@lru_cache(maxsize=12)
+def _get_balance_trend_data(year: str, month: str | None = None) -> dict[str, Any]:
+    year_int = cint(year)
+    today_date = getdate(today())
+
+    series = []
+    prev_total: float | None = None
+    for month_no, month_label in enumerate(SHORT_MONTHS, start=1):
+        if year_int == today_date.year and month_no > today_date.month:
+            series.append({"month": month_label, "total": None, "total_display": None, "is_up": None, "change_pct": None, "change_pct_display": None})
+            continue
+
+        period_end = str(get_last_day(f"{year_int}-{month_no:02d}-01"))
+        total = _get_total_balance_numeric(period_end)
+
+        if prev_total is not None:
+            change = total - prev_total
+            is_up = change >= 0
+            change_pct = round(_safe_div(change * 100, abs(prev_total)), 1) if prev_total else None
+            change_pct_display = (f"+{change_pct}%" if change_pct is not None and change_pct >= 0 else f"{change_pct}%") if change_pct is not None else None
+        else:
+            is_up = True
+            change_pct = None
+            change_pct_display = None
+
+        series.append({
+            "month": month_label,
+            "total": round(total, 2),
+            "total_display": _compact_money_label(total),
+            "is_up": is_up,
+            "change_pct": change_pct,
+            "change_pct_display": change_pct_display,
+        })
+        prev_total = total
+
+    return {"series": series}
+
+
+@lru_cache(maxsize=48)
+def _get_total_balance_numeric(period_end: str) -> float:
+    stock = flt(_get_stock_total_cached(period_end))
+    debtor = flt(_get_debtor_total_cached(period_end))
+    creditor = flt(_get_creditor_total_cached(period_end))
+    cash = flt(_get_cash_total_cached(period_end))
+    return stock + debtor - creditor + cash
+
+
 def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
     month_no = _month_no(month) or 12
     period_end = str(get_last_day(f"{cint(year)}-{month_no:02d}-01"))
@@ -753,7 +821,7 @@ def _get_balance_details_data(year: str, month: str) -> dict[str, Any]:
 
     return {
         "items": items,
-        "total_balance": _format_uzs(stock_total + debtor_total - creditor_total + cash_total),
+        "total_balance": _format_uzs(_get_total_balance_numeric(period_end)),
     }
 
 
@@ -973,6 +1041,8 @@ def get_dashboard_data(year: str | None = None, month: str | None = None) -> dic
     _get_creditor_total_cached.cache_clear()
     _get_stock_total_cached.cache_clear()
     _get_cash_total_cached.cache_clear()
+    _get_balance_trend_data.cache_clear()
+    _get_total_balance_numeric.cache_clear()
 
     filters = _resolve_filters(year, month)
     selected_year = filters["selected_year"]
@@ -984,6 +1054,7 @@ def get_dashboard_data(year: str | None = None, month: str | None = None) -> dic
         "margin_bonus": _get_margin_bonus_data(selected_year, selected_month),
         "average_check": _get_average_check_data(selected_year, selected_month),
         "balance_details": _get_balance_details_data(selected_year, selected_month),
+        "balance_trend": _get_balance_trend_data(selected_year, selected_month),
         "break_even": _get_break_even_data(selected_year, selected_month),
         "unit_cost": _get_unit_cost_data(selected_year, selected_month),
         "returns_analysis": _get_returns_analysis_data(selected_year),
