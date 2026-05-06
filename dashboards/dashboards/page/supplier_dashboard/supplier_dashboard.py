@@ -146,7 +146,7 @@ def _party_filter_clause(view: str, party: str | None, params: dict[str, Any], a
 		return ""
 	config = _party_dashboard_config(view)
 	params["party"] = party
-	field = config["payment_party_field"] if alias == "pe" else config["party_field"]
+	field = config["payment_party_field"] if alias in {"pe", "ple"} else config["party_field"]
 	return f" AND {alias}.{field} = %(party)s"
 
 
@@ -158,23 +158,64 @@ def _get_party_invoice_rows(view: str, start_date: str, end_date: str, party: st
 	return frappe.db.sql(
 		f"""
 		SELECT
-			doc.{config['party_field']} AS party,
-			COALESCE(NULLIF(doc.{config['name_field']}, ''), doc.{config['party_field']}, '{config['party_title_plural']}') AS party_name,
-			doc.posting_date,
-			doc.currency,
-			doc.company,
-			SUM(CASE WHEN doc.posting_date < %(start_date)s THEN COALESCE(doc.grand_total, 0) ELSE 0 END) AS opening_amount,
-			SUM(CASE WHEN doc.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN COALESCE(doc.grand_total, 0) ELSE 0 END) AS inflow_amount,
-			SUM(CASE WHEN doc.posting_date < %(start_date)s THEN COALESCE(item.stock_qty, item.qty, 0) ELSE 0 END) AS opening_kg,
-			SUM(CASE WHEN doc.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN COALESCE(item.stock_qty, item.qty, 0) ELSE 0 END) AS inflow_kg
-		FROM `{config['invoice_table']}` doc
-		INNER JOIN `{config['invoice_item_table']}` item ON item.parent = doc.name
-		WHERE doc.docstatus = 1
-		  AND COALESCE(doc.is_return, 0) = 0
-		  {party_clause}
-		GROUP BY doc.{config['party_field']}, party_name, doc.posting_date, doc.currency, doc.company
+			invoice.party,
+			invoice.party_name,
+			invoice.posting_date,
+			invoice.currency,
+			invoice.company,
+			SUM(CASE WHEN invoice.posting_date < %(start_date)s THEN invoice.grand_total ELSE 0 END) AS opening_amount,
+			SUM(CASE WHEN invoice.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN invoice.grand_total ELSE 0 END) AS inflow_amount,
+			SUM(CASE WHEN invoice.posting_date < %(start_date)s THEN invoice.qty_total ELSE 0 END) AS opening_kg,
+			SUM(CASE WHEN invoice.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN invoice.qty_total ELSE 0 END) AS inflow_kg
+		FROM (
+			SELECT
+				doc.name,
+				doc.{config['party_field']} AS party,
+				COALESCE(NULLIF(doc.{config['name_field']}, ''), doc.{config['party_field']}, '{config['party_title_plural']}') AS party_name,
+				doc.posting_date,
+				doc.currency,
+				doc.company,
+				COALESCE(doc.grand_total, 0) AS grand_total,
+				SUM(COALESCE(item.stock_qty, item.qty, 0)) AS qty_total
+			FROM `{config['invoice_table']}` doc
+			LEFT JOIN `{config['invoice_item_table']}` item ON item.parent = doc.name
+			WHERE doc.docstatus = 1
+			  {party_clause}
+			GROUP BY doc.name, doc.{config['party_field']}, party_name, doc.posting_date, doc.currency, doc.company, doc.grand_total
+		) invoice
+		GROUP BY invoice.party, invoice.party_name, invoice.posting_date, invoice.currency, invoice.company
 		""",
 		params,
+		as_dict=True,
+	)
+
+
+def _get_party_journal_rows(view: str, start_date: str, end_date: str, party: str | None = None) -> list[dict[str, Any]]:
+	config = _party_dashboard_config(view)
+	params = {"start_date": start_date, "end_date": end_date}
+	party_clause = _party_filter_clause(view, party, params, "ple")
+
+	return frappe.db.sql(
+		f"""
+		SELECT
+			ple.party,
+			COALESCE(NULLIF(party.{config['payment_party_name_field']}, ''), ple.party, '{config['unknown_party']}') AS party_name,
+			ple.posting_date,
+			ple.company,
+			ple.account_currency AS currency,
+			SUM(CASE WHEN ple.posting_date < %(start_date)s THEN COALESCE(ple.amount_in_account_currency, 0) ELSE 0 END) AS opening_amount,
+			SUM(CASE WHEN ple.posting_date BETWEEN %(start_date)s AND %(end_date)s THEN COALESCE(ple.amount_in_account_currency, 0) ELSE 0 END) AS period_amount
+		FROM `tabPayment Ledger Entry` ple
+		LEFT JOIN `{config['payment_party_table']}` party ON party.name = ple.party
+		WHERE ple.docstatus = 1
+		  AND COALESCE(ple.delinked, 0) = 0
+		  AND ple.party_type = %(party_type)s
+		  AND ple.party IS NOT NULL
+		  AND ple.voucher_type = 'Journal Entry'
+		  {party_clause}
+		GROUP BY ple.party, party_name, ple.posting_date, ple.company, ple.account_currency
+		""",
+		{**params, "party_type": config["party_type"]},
 		as_dict=True,
 	)
 
@@ -257,6 +298,31 @@ def _build_party_rows(view: str, start_date: str, end_date: str, party: str | No
 		entry["kg"] += flt(row.inflow_kg)
 		entry["opening_base"] += convert_to_reporting_currency(row.opening_amount, row.currency, row.posting_date, row.company)
 		entry["inflow_base"] += convert_to_reporting_currency(row.inflow_amount, row.currency, row.posting_date, row.company)
+
+	for row in _get_party_journal_rows(view, start_date, end_date, party=party):
+		key = (str(row.party), str(row.currency or "UZS"))
+		entry = rows_by_key.setdefault(
+			key,
+			{
+				"party": row.party,
+				"party_name": row.party_name,
+				"currency": row.currency or "UZS",
+				"opening": 0.0,
+				"inflow": 0.0,
+				"kg": 0.0,
+				"cash_payment": 0.0,
+				"bank_payment": 0.0,
+				"opening_base": 0.0,
+				"inflow_base": 0.0,
+				"cash_payment_base": 0.0,
+				"bank_payment_base": 0.0,
+			},
+		)
+		entry["party_name"] = row.party_name
+		entry["opening"] += flt(row.opening_amount)
+		entry["inflow"] += flt(row.period_amount)
+		entry["opening_base"] += convert_to_reporting_currency(row.opening_amount, row.currency, row.posting_date, row.company)
+		entry["inflow_base"] += convert_to_reporting_currency(row.period_amount, row.currency, row.posting_date, row.company)
 
 	for row in _get_party_payment_rows(view, start_date, end_date, party=party):
 		key = (str(row.party), str(row.currency or "UZS"))

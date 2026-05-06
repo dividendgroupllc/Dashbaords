@@ -617,18 +617,26 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
     bonus_rows = frappe.db.sql(
         f"""
         SELECT
-            COALESCE(NULLIF(customer_name, ''), customer, 'Неизвестный клиент') AS client,
-            posting_date,
-            company,
-            SUM(ABS(COALESCE(base_net_total, net_total, 0))) AS bonus_amount
-        FROM `tabSales Invoice`
-        WHERE docstatus = 1
-          AND COALESCE(is_return, 0) = 1
-          AND COALESCE(update_stock, 0) = 1
-          {_period_clause(selected_year, month)[0]}
-        GROUP BY COALESCE(NULLIF(customer_name, ''), customer, 'Неизвестный клиент'), posting_date, company
+            COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент') AS client,
+            si.posting_date,
+            si.company,
+            SUM(
+                CASE
+                    WHEN COALESCE(si.is_return, 0) = 1 THEN -1
+                    ELSE 1
+                END * ABS(COALESCE(sii.base_net_amount, sii.base_amount, sii.net_amount, sii.amount, 0))
+            ) AS bonus_amount
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND (
+              LOWER(TRIM(COALESCE(sii.item_name, ''))) IN ('bonus', 'бонус')
+              OR LOWER(TRIM(COALESCE(sii.item_code, ''))) IN ('bonus', 'бонус')
+          )
+          {clause}
+        GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент'), si.posting_date, si.company
         """,
-        _period_clause(selected_year, month)[1],
+        params,
         as_dict=True,
     )
 
