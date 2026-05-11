@@ -113,7 +113,7 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 	result = []
 	for row in sorted(grouped.values(), key=lambda value: flt(value["sales"]), reverse=True):
 		sales = flt(row["sales"])
-		cost = flt(row["cost"]) or flt(cogs_map.get(row["item_key"]))
+		cost = flt(cogs_map.get(row["item_key"]))
 		margin = sales - cost
 		rsp = flt(rcp_map.get(row["item_key"]))
 		profit = margin - rsp

@@ -10,7 +10,7 @@ from dashboards.dashboards.dashboard_data import (
 	MONTH_LABELS,
 	convert_company_currency_amount,
 	convert_to_reporting_currency,
-	get_cogs_total,
+	get_gross_profit_item_cogs_map,
 	get_item_bonus_map,
 )
 
@@ -240,19 +240,13 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 
 	values = sorted(grouped.values(), key=lambda row: flt(row["sales"]), reverse=True)
 	total_sales = sum(flt(row["sales"]) for row in values)
-	total_cost = sum(flt(row["cost"]) for row in values)
 	item_bonus_map = get_item_bonus_map(year, MONTH_MAP[month]) if values else {}
-	item_cogs_map = _get_filtered_item_cogs_map(year, month, client, day) if not total_cost else {}
-	period_cogs_total = flt(get_cogs_total(year, MONTH_MAP[month])) if not total_cost and total_sales and not client and not day else 0
+	item_cogs_map = get_gross_profit_item_cogs_map(year, MONTH_MAP[month], customer=client, day=day) if values else {}
 
 	result = []
 	for row in values:
 		sales = flt(row["sales"])
-		cost = flt(row["cost"])
-		if not cost:
-			cost = flt(item_cogs_map.get(row["item_key"]))
-		if not cost and period_cogs_total:
-			cost = period_cogs_total * sales / total_sales
+		cost = flt(item_cogs_map.get(row["item_key"]))
 		margin = sales - cost
 		bonus = flt(item_bonus_map.get(row["item_key"]))
 		np = margin - bonus

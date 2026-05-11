@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 from typing import Any
 
 import json
@@ -770,6 +771,169 @@ def _month_number(month: str | int | None) -> int | None:
     return MONTH_LOOKUP.get(month_key)
 
 
+def _period_date_range(year: str | int | None, month: str | int | None = None) -> tuple[str | None, str | None]:
+    if not year:
+        return None, None
+
+    month_no = _month_number(month)
+    if month_no:
+        last_day = calendar.monthrange(int(year), month_no)[1]
+        return f"{int(year)}-{month_no:02d}-01", f"{int(year)}-{month_no:02d}-{last_day:02d}"
+
+    return f"{int(year)}-01-01", f"{int(year)}-12-31"
+
+
+def _get_report_row_value(row, columns: list[dict[str, Any]], fieldname: str):
+    if isinstance(row, dict):
+        return row.get(fieldname)
+
+    for index, column in enumerate(columns):
+        if column.get("fieldname") == fieldname and index < len(row):
+            return row[index]
+
+    return None
+
+
+def _get_sales_invoice_companies(from_date: str, to_date: str, invoices: list[str] | None = None) -> list[str]:
+    filters: dict[str, Any] = {"from_date": from_date, "to_date": to_date}
+    invoice_clause = ""
+    if invoices:
+        filters["invoices"] = tuple(invoices)
+        invoice_clause = " AND name IN %(invoices)s"
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT DISTINCT company
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          {invoice_clause}
+        ORDER BY company
+        """,
+        filters,
+        as_dict=True,
+    )
+    return [str(row.company) for row in rows if row.company]
+
+
+def _get_sales_invoice_names(
+    from_date: str,
+    to_date: str,
+    customer: str | None = None,
+    day: int | None = None,
+) -> list[str]:
+    filters: dict[str, Any] = {"from_date": from_date, "to_date": to_date}
+    customer_clause = ""
+    day_clause = ""
+
+    if customer:
+        filters["customer"] = customer
+        customer_clause = (
+            " AND COALESCE(NULLIF(customer_name, ''), customer, 'Неизвестный клиент') = %(customer)s"
+        )
+
+    if day:
+        filters["day"] = int(day)
+        day_clause = " AND DAY(posting_date) = %(day)s"
+
+    rows = frappe.db.sql(
+        f"""
+        SELECT name
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          {customer_clause}
+          {day_clause}
+        ORDER BY posting_date, name
+        """,
+        filters,
+        as_dict=True,
+    )
+    return [str(row.name) for row in rows if row.name]
+
+
+def _get_gross_profit_rows_for_company(
+    company: str,
+    from_date: str,
+    to_date: str,
+    group_by: str,
+    sales_invoice: str | None = None,
+) -> tuple[list[dict[str, Any]], list[Any]]:
+    from erpnext.accounts.report.gross_profit.gross_profit import execute as gross_profit_execute
+
+    filters = frappe._dict(
+        {
+            "company": company,
+            "from_date": from_date,
+            "to_date": to_date,
+            "group_by": group_by,
+            "include_returned_invoices": 1,
+        }
+    )
+    if sales_invoice:
+        filters["sales_invoice"] = sales_invoice
+
+    columns, rows = gross_profit_execute(filters)
+    return columns, rows
+
+
+def get_gross_profit_cost_total(
+    year: str | int | None,
+    month: str | int | None = None,
+    customer: str | None = None,
+    day: int | None = None,
+) -> float:
+    cost_by_item = get_gross_profit_item_cogs_map(year, month, customer=customer, day=day)
+    return sum(flt(value) for value in cost_by_item.values())
+
+
+def get_gross_profit_item_cogs_map(
+    year: str | int | None,
+    month: str | int | None = None,
+    customer: str | None = None,
+    day: int | None = None,
+) -> dict[str, float]:
+    from_date, to_date = _period_date_range(year, month)
+    if not from_date or not to_date:
+        return {}
+
+    invoices = _get_sales_invoice_names(from_date, to_date, customer=customer, day=day) if customer or day else []
+    if (customer or day) and not invoices:
+        return {}
+
+    companies = _get_sales_invoice_companies(from_date, to_date, invoices=invoices or None)
+    result: dict[str, float] = {}
+
+    if invoices:
+        for invoice in invoices:
+            invoice_company = frappe.db.get_value("Sales Invoice", invoice, "company")
+            if not invoice_company:
+                continue
+            columns, rows = _get_gross_profit_rows_for_company(
+                str(invoice_company), from_date, to_date, "Item Code", sales_invoice=invoice
+            )
+            for row in rows:
+                item_code = _get_report_row_value(row, columns, "item_code")
+                if not item_code or item_code == "Total":
+                    continue
+                buying_amount = flt(_get_report_row_value(row, columns, "buying_amount"))
+                converted_amount = convert_company_currency_amount_like_report(buying_amount, to_date, invoice_company)
+                result[str(item_code)] = result.get(str(item_code), 0.0) + converted_amount
+        return result
+
+    for company in companies:
+        columns, rows = _get_gross_profit_rows_for_company(company, from_date, to_date, "Item Code")
+        for row in rows:
+            item_code = _get_report_row_value(row, columns, "item_code")
+            if not item_code or item_code == "Total":
+                continue
+            buying_amount = flt(_get_report_row_value(row, columns, "buying_amount"))
+            converted_amount = convert_company_currency_amount_like_report(buying_amount, to_date, company)
+            result[str(item_code)] = result.get(str(item_code), 0.0) + converted_amount
+
+    return result
+
+
 def _get_expense_total_by_root(
     year: str | int | None,
     month: str | int | None,
@@ -989,44 +1153,11 @@ def get_item_stock_ledger_cost_map(year: str | int | None, month: str | int | No
 
 
 def get_cogs_total(year: str | int | None, month: str | int | None = None) -> float:
-    return get_stock_ledger_cost_total(year, month) or _get_expense_total_by_root(year, month, ["Cost of Goods Sold"])
+    return get_gross_profit_cost_total(year, month)
 
 
 def get_item_cogs_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
-    stock_ledger_cost_map = get_item_stock_ledger_cost_map(year, month)
-    if stock_ledger_cost_map:
-        return stock_ledger_cost_map
-
-    if not year:
-        return {}
-
-    month_no = _month_number(month)
-    month_filter_sales = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
-
-    sold_rows = frappe.db.sql(
-        f"""
-        SELECT
-            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
-            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        WHERE si.docstatus = 1
-          AND COALESCE(si.is_return, 0) = 0
-          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
-          {month_filter_sales}
-        GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар')
-        """,
-        as_dict=True,
-    )
-
-    cogs_total = get_cogs_total(year, month)
-    total_sold_qty = sum(flt(row.qty) for row in sold_rows)
-
-    return {
-        row.item_key: flt(row.qty) / total_sold_qty * cogs_total
-        for row in sold_rows
-        if total_sold_qty
-    }
+    return get_gross_profit_item_cogs_map(year, month)
 
 
 def get_item_rcp_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:

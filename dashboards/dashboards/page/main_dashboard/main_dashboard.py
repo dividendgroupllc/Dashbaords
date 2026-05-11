@@ -223,6 +223,7 @@ def _get_monthly_sales_metrics(year: str) -> dict[int, dict[str, float]]:
     sales_amounts = get_monthly_sales_from_profit_and_loss(year)
     for month_no in range(1, 13):
         month_map[month_no]["sales_amount"] = flt(sales_amounts.get(month_no))
+        month_map[month_no]["cost_amount"] = flt(get_cogs_total(year, month_no))
     return month_map
 
 

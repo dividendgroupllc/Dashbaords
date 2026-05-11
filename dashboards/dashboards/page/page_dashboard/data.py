@@ -192,7 +192,7 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
     else:
         sales_total = sum(flt(value) for value in monthly_sales.values())
 
-    cost_total = _sum_company_currency_rows(item_totals, "cost_total") or flt(get_cogs_total(selected_year, month))
+    cost_total = flt(get_cogs_total(selected_year, month))
     rcp_total = flt(rcp_totals["direct_total"])
     margin_total = sales_total - cost_total - rcp_total
     invoice_count = sum(flt(row.invoice_count) for row in invoice_totals)
@@ -436,7 +436,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
     for row in values:
         row["cost"] = product_cogs_amounts.get(
             str(row["label"]),
-            product_cogs_amounts.get(str(row.get("item_code") or ""), flt(row["cost"])),
+            product_cogs_amounts.get(str(row.get("item_code") or ""), 0.0),
         )
         row["rsp"] = flt(row["qty"]) * rcp_per_kg
         row["margin"] = flt(row["sales"]) - flt(row["cost"])
