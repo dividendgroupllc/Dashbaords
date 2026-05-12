@@ -35,6 +35,9 @@ def ensure_workspace_roles():
     workspace = frappe.get_doc("Workspace", "Dashboards")
     workspace.public = 1
     workspace.module = "Dashboards"
+    workspace.icon = "chart"
+    workspace.parent_page = ""
+    workspace.sequence_id = 1.5
     workspace.set("roles", [{"role": role} for role in ACCESS_ROLES])
     workspace.save(ignore_permissions=True)
 

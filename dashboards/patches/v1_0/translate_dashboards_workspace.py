@@ -31,6 +31,21 @@ LINK_LABELS_BY_ROUTE = {
     route.removeprefix("/app/"): label
     for route, label in SHORTCUT_LABELS_BY_URL.items()
 }
+WORKSPACE_LINK_ORDER = [
+    "main-dashboard",
+    "page-dashboard",
+    "sales-dashboard",
+    "daily-dashboard",
+    "supplier-dashboard",
+    "monthly-analysis",
+    "dividend-analysis",
+    "product-comparison",
+    "customer-comparison",
+    "product-by-customer",
+    "comparison-by-weight",
+    "comparison-by-amount",
+    "comparison-by-product",
+]
 
 
 def execute():
@@ -38,10 +53,17 @@ def execute():
         return
 
     workspace = frappe.get_doc("Workspace", WORKSPACE_NAME)
+    update_workspace_placement(workspace)
     update_workspace_content(workspace)
     update_workspace_links(workspace)
     update_workspace_shortcuts(workspace)
     workspace.save(ignore_permissions=True)
+
+
+def update_workspace_placement(workspace):
+    workspace.icon = "chart"
+    workspace.parent_page = ""
+    workspace.sequence_id = 1.5
 
 
 def update_workspace_content(workspace):
@@ -79,6 +101,32 @@ def update_workspace_content(workspace):
 
 
 def update_workspace_links(workspace):
+    card_breaks = [link for link in workspace.links if link.type == "Card Break"]
+    links_by_route = {
+        link.link_to: link
+        for link in workspace.links
+        if link.link_type == "Page" and link.link_to in WORKSPACE_LINK_ORDER
+    }
+    ordered_links = []
+
+    if card_breaks:
+        card_breaks[0].label = CARD_LABEL
+        card_breaks[0].link_count = len(WORKSPACE_LINK_ORDER)
+        ordered_links.append(card_breaks[0])
+
+    for route in WORKSPACE_LINK_ORDER:
+        link = links_by_route.get(route)
+        if not link:
+            continue
+        link.label = LINK_LABELS_BY_ROUTE[route]
+        ordered_links.append(link)
+
+    if ordered_links:
+        workspace.set("links", ordered_links)
+        for index, link in enumerate(workspace.links, start=1):
+            link.idx = index
+        return
+
     for link in workspace.links:
         if link.link_type == "DocType" and link.type == "Card Break":
             link.label = CARD_LABEL
