@@ -442,7 +442,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
         row["margin"] = flt(row["sales"]) - flt(row["cost"])
         row["net_margin"] = flt(row["margin"]) - flt(row["rsp"])
 
-    sorted_values = sorted(values, key=lambda row: row["sales"], reverse=True)
+    sorted_values = sorted(values, key=lambda row: flt(row["qty"]), reverse=True)
     selected_values = sorted_values[:limit] if limit is not None else sorted_values
     total_qty = sum(flt(row["qty"]) for row in values)
     total_cost = sum(flt(row["cost"]) for row in values)

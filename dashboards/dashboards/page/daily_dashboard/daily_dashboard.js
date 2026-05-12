@@ -244,7 +244,19 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			{ label: "ЧП", className: "is-number" },
 			{ label: "Рен ЧП", className: "is-number" },
 		];
-		const colgroup = `<colgroup><col style="width:28%">${Array(8).fill('<col style="width:9%">').join("")}</colgroup>`;
+			const colgroup = `
+				<colgroup>
+					<col style="width:260px">
+					<col style="width:90px">
+					<col style="width:150px">
+					<col style="width:150px">
+					<col style="width:150px">
+					<col style="width:130px">
+					<col style="width:82px">
+					<col style="width:150px">
+					<col style="width:90px">
+				</colgroup>
+			`;
 
 		this.$table.html(`
 			<div class="daily-dashboard-table-scroll">

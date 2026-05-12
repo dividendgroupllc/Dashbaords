@@ -8,8 +8,6 @@ DEFAULT_ROUTE_ORDER = [
     "page-dashboard",
     "daily-dashboard",
     "sales-dashboard",
-    "cash-dashboard",
-    "client-dashboard",
     "comparison-by-product",
     "dividend-analysis",
     "supplier-dashboard",

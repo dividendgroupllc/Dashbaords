@@ -9,8 +9,6 @@ frappe.provide("dashboards.ui");
 		{ label: __("Дашборд"), route: "page-dashboard" },
 		{ label: __("Ежедневно"), route: "daily-dashboard" },
 		{ label: __("Продажа"), route: "sales-dashboard" },
-		{ label: __("Касса"), route: "cash-dashboard" },
-		{ label: __("Клиент"), route: "client-dashboard" },
 		{ label: __("Срав. по товару"), route: "comparison-by-product" },
 		{ label: __("Дивиденды"), route: "dividend-analysis" },
 		{ label: __("Поставщики"), route: "supplier-dashboard" },

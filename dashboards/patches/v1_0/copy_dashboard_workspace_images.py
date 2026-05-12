@@ -15,8 +15,6 @@ IMAGE_MAP = {
     "ГЛАВНЫЙ.jpg": "overview-dashboard.jpg",
     "Дивидент.jpg": "dividend-analysis.jpg",
     "Ежедневно.jpg": "daily-dashboard.jpg",
-    "Касса.jpg": "cash-dashboard.jpg",
-    "Клиент.jpg": "customer-dashboard.jpg",
     "Поставшик.jpg": "supplier-dashboard.jpg",
     "Продажа.jpg": "sales-dashboard.jpg",
     "Срав. по кг.jpg": "comparison-by-weight.jpg",

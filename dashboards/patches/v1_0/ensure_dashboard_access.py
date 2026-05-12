@@ -11,8 +11,6 @@ DASHBOARD_PAGES = (
     "overview-dashboard",
     "dividend-analysis",
     "daily-dashboard",
-    "cash-dashboard",
-    "client-dashboard",
     "supplier-dashboard",
     "sales-dashboard",
     "comparison-by-weight",

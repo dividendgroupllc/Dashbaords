@@ -27,8 +27,6 @@ TAB_ITEMS = [
     {"label": "ПАНЕЛЬ", "route": "/app/page-dashboard", "active": 1},
     {"label": "ЕЖЕДНЕВНО", "route": "/app/daily-dashboard"},
     {"label": "ПРОДАЖА", "route": "/app/sales-dashboard"},
-    {"label": "КАССА", "route": "/app/cash-dashboard"},
-    {"label": "КЛИЕНТ", "route": "/app/client-dashboard"},
     {"label": "ДИВИДЕНДЫ", "route": "/app/dividend-analysis"},
     {"label": "ЕЖЕМЕСЯЧНО", "route": "/app/monthly-analysis"},
     {"label": "ПОСТАВЩИКИ", "route": "/app/supplier-dashboard"},
