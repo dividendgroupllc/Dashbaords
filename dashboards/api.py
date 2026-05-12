@@ -20,7 +20,7 @@ DEFAULT_ROUTE_ORDER = [
     "customer-comparison",
     "product-by-customer",
 ]
-HIDDEN_ROUTES = {"main-dashboard-static", "kpi-dashboard"}
+HIDDEN_ROUTES = {"kpi-dashboard"}
 
 
 @frappe.whitelist()

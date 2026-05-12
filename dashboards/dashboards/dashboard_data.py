@@ -887,6 +887,31 @@ def get_gross_profit_cost_total(
     return sum(flt(value) for value in cost_by_item.values())
 
 
+def get_gross_profit_totals(
+    year: str | int | None,
+    month: str | int | None = None,
+) -> dict[str, float]:
+    from_date, to_date = _period_date_range(year, month)
+    if not from_date or not to_date:
+        return {"selling_amount": 0.0, "buying_amount": 0.0, "gross_profit": 0.0}
+
+    totals = {"selling_amount": 0.0, "buying_amount": 0.0, "gross_profit": 0.0}
+    for company in _get_sales_invoice_companies(from_date, to_date):
+        columns, rows = _get_gross_profit_rows_for_company(company, from_date, to_date, "Item Code")
+        if not rows:
+            continue
+
+        total_row = rows[-1]
+        if _get_report_row_value(total_row, columns, "item_code") != "Total":
+            continue
+
+        for fieldname in totals:
+            value = flt(_get_report_row_value(total_row, columns, fieldname))
+            totals[fieldname] += convert_company_currency_amount_like_report(value, to_date, company)
+
+    return totals
+
+
 def get_gross_profit_item_cogs_map(
     year: str | int | None,
     month: str | int | None = None,

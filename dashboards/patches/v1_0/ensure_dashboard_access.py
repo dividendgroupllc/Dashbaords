@@ -6,6 +6,7 @@ import frappe
 ACCESS_ROLE = "investor"
 DASHBOARD_PAGES = (
     "main-dashboard",
+    "page-dashboard",
     "monthly-analysis",
     "overview-dashboard",
     "dividend-analysis",
@@ -35,7 +36,7 @@ def ensure_workspace_roles():
 
     workspace = frappe.get_doc("Workspace", "Dashboards")
     workspace.public = 1
-    workspace.module = ""
+    workspace.module = "Dashboards"
     workspace.set("roles", [{"role": role} for role in ACCESS_ROLES])
     workspace.save(ignore_permissions=True)
 

@@ -1,0 +1,197 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"dashboards_pages\",\"type\":\"card\",\"data\":{\"card_name\":\"Dashboardlar\",\"col\":4}}]",
+ "creation": "2026-05-11 21:45:14.642699",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "chart",
+ "idx": 0,
+ "indicator_color": "",
+ "is_hidden": 0,
+ "label": "Dashboards",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Dashboardlar",
+   "link_count": 16,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Main Dashboard",
+   "link_count": 0,
+   "link_to": "main-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Page Dashboard",
+   "link_count": 0,
+   "link_to": "page-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Dashboard",
+   "link_count": 0,
+   "link_to": "sales-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily Dashboard",
+   "link_count": 0,
+   "link_to": "daily-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Supplier Dashboard",
+   "link_count": 0,
+   "link_to": "supplier-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Client Dashboard",
+   "link_count": 0,
+   "link_to": "client-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cash Dashboard",
+   "link_count": 0,
+   "link_to": "cash-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Analysis",
+   "link_count": 0,
+   "link_to": "monthly-analysis",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Dividend Analysis",
+   "link_count": 0,
+   "link_to": "dividend-analysis",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Product Comparison",
+   "link_count": 0,
+   "link_to": "product-comparison",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer Comparison",
+   "link_count": 0,
+   "link_to": "customer-comparison",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Product By Customer",
+   "link_count": 0,
+   "link_to": "product-by-customer",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Comparison By Weight",
+   "link_count": 0,
+   "link_to": "comparison-by-weight",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Comparison By Amount",
+   "link_count": 0,
+   "link_to": "comparison-by-amount",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Comparison By Product",
+   "link_count": 0,
+   "link_to": "comparison-by-product",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-05-11 21:47:46.731727",
+ "modified_by": "Administrator",
+ "module": "Dashboards",
+ "name": "Dashboards",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "investor"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 25.0,
+ "shortcuts": [],
+ "title": "Dashboards"
+}
