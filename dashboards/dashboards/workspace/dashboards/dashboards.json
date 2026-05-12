@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"dashboards_pages\",\"type\":\"card\",\"data\":{\"card_name\":\"Dashboardlar\",\"col\":4}}]",
+ "content": "[{\"id\":\"dashboards_pages\",\"type\":\"card\",\"data\":{\"card_name\":\"Дашборды\",\"col\":4}}]",
  "creation": "2026-05-11 21:45:14.642699",
  "custom_blocks": [],
  "docstatus": 0,
@@ -16,7 +16,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dashboardlar",
+   "label": "Дашборды",
    "link_count": 16,
    "link_type": "DocType",
    "onboard": 0,
@@ -25,7 +25,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Main Dashboard",
+   "label": "Главный дашборд",
    "link_count": 0,
    "link_to": "main-dashboard",
    "link_type": "Page",
@@ -35,7 +35,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Page Dashboard",
+   "label": "Дашборд",
    "link_count": 0,
    "link_to": "page-dashboard",
    "link_type": "Page",
@@ -45,7 +45,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Sales Dashboard",
+   "label": "Дашборд продаж",
    "link_count": 0,
    "link_to": "sales-dashboard",
    "link_type": "Page",
@@ -55,7 +55,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Daily Dashboard",
+   "label": "Ежедневный дашборд",
    "link_count": 0,
    "link_to": "daily-dashboard",
    "link_type": "Page",
@@ -65,7 +65,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supplier Dashboard",
+   "label": "Дашборд по поставщикам",
    "link_count": 0,
    "link_to": "supplier-dashboard",
    "link_type": "Page",
@@ -75,7 +75,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Monthly Analysis",
+   "label": "Ежемесячный анализ",
    "link_count": 0,
    "link_to": "monthly-analysis",
    "link_type": "Page",
@@ -85,7 +85,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dividend Analysis",
+   "label": "Анализ дивидендов",
    "link_count": 0,
    "link_to": "dividend-analysis",
    "link_type": "Page",
@@ -95,7 +95,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Product Comparison",
+   "label": "Сравнение продуктов",
    "link_count": 0,
    "link_to": "product-comparison",
    "link_type": "Page",
@@ -105,7 +105,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Customer Comparison",
+   "label": "Сравнение клиентов",
    "link_count": 0,
    "link_to": "customer-comparison",
    "link_type": "Page",
@@ -115,7 +115,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Product By Customer",
+   "label": "Продукты по клиентам",
    "link_count": 0,
    "link_to": "product-by-customer",
    "link_type": "Page",
@@ -125,7 +125,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Comparison By Weight",
+   "label": "Сравнение по весу",
    "link_count": 0,
    "link_to": "comparison-by-weight",
    "link_type": "Page",
@@ -135,7 +135,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Comparison By Amount",
+   "label": "Сравнение по сумме",
    "link_count": 0,
    "link_to": "comparison-by-amount",
    "link_type": "Page",
@@ -145,7 +145,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Comparison By Product",
+   "label": "Сравнение по продуктам",
    "link_count": 0,
    "link_to": "comparison-by-product",
    "link_type": "Page",
