@@ -79,7 +79,7 @@ def _get_marketing_account_names() -> list[str]:
     }
     accounts = frappe.get_all(
         "Account",
-        filters={**account_filters, "name": "5213 - Маркетинг харажати - P"},
+        filters={**account_filters, "name": "Marketing Expenses - P"},
         pluck="name",
     )
     if not accounts:
@@ -727,6 +727,9 @@ def _get_payable_outstanding_rows(year: str, month: str) -> dict[str, float]:
             },
             pluck="name",
         )
+
+    if not payable_accounts:
+        return {}
 
     rows = frappe.db.sql(
         """

@@ -13,6 +13,7 @@ DASHBOARD_PAGES = (
     "daily-dashboard",
     "supplier-dashboard",
     "sales-dashboard",
+    "manufacture-dashboard",
     "comparison-by-weight",
     "comparison-by-amount",
     "comparison-by-product",

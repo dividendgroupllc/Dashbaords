@@ -9,6 +9,7 @@ frappe.provide("dashboards.ui");
 		{ label: __("Дашборд"), route: "page-dashboard" },
 		{ label: __("Ежедневно"), route: "daily-dashboard" },
 		{ label: __("Продажа"), route: "sales-dashboard" },
+		{ label: __("Производство"), route: "manufacture-dashboard" },
 		{ label: __("Срав. по товару"), route: "comparison-by-product" },
 		{ label: __("Дивиденды"), route: "dividend-analysis" },
 		{ label: __("Поставщики"), route: "supplier-dashboard" },
@@ -50,11 +51,30 @@ frappe.provide("dashboards.ui");
 		if (!menuItemsPromise) {
 			menuItemsPromise = frappe
 				.call("dashboards.api.get_dashboard_sidebar_items")
-				.then((response) => response.message || [])
+				.then((response) => mergeMenuItems(response.message || []))
 				.catch(() => FALLBACK_MENU_ITEMS);
 		}
 
 		return menuItemsPromise;
+	}
+
+	function mergeMenuItems(serverItems) {
+		const byRoute = new Map();
+		FALLBACK_MENU_ITEMS.forEach((item) => byRoute.set(item.route, item));
+		serverItems.forEach((item) => {
+			if (item && item.route) {
+				byRoute.set(item.route, item);
+			}
+		});
+
+		const orderedItems = FALLBACK_MENU_ITEMS.map((item) => byRoute.get(item.route)).filter(Boolean);
+		serverItems.forEach((item) => {
+			if (item && item.route && !FALLBACK_MENU_ITEMS.some((fallbackItem) => fallbackItem.route === item.route)) {
+				orderedItems.push(item);
+			}
+		});
+
+		return orderedItems;
 	}
 
 	function renderSidebar({ $sidebarHost, route, items }) {

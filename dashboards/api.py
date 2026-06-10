@@ -8,6 +8,7 @@ DEFAULT_ROUTE_ORDER = [
     "page-dashboard",
     "daily-dashboard",
     "sales-dashboard",
+    "manufacture-dashboard",
     "comparison-by-product",
     "dividend-analysis",
     "supplier-dashboard",
@@ -18,6 +19,22 @@ DEFAULT_ROUTE_ORDER = [
     "customer-comparison",
     "product-by-customer",
 ]
+DEFAULT_ROUTE_LABELS = {
+    "main-dashboard": "Главный дашборд",
+    "page-dashboard": "Дашборд",
+    "daily-dashboard": "Ежедневный дашборд",
+    "sales-dashboard": "Дашборд продаж",
+    "manufacture-dashboard": "Производственный дашборд",
+    "comparison-by-product": "Сравнение по товару",
+    "dividend-analysis": "Анализ дивидендов",
+    "supplier-dashboard": "Дашборд по поставщикам",
+    "monthly-analysis": "Ежемесячный анализ",
+    "comparison-by-weight": "Сравнение по весу",
+    "comparison-by-amount": "Сравнение по сумме",
+    "product-comparison": "Сравнение продуктов",
+    "customer-comparison": "Сравнение клиентов",
+    "product-by-customer": "Продукты по клиентам",
+}
 HIDDEN_ROUTES = {"kpi-dashboard"}
 
 
@@ -34,13 +51,18 @@ def get_dashboard_sidebar_items() -> list[dict[str, str]]:
         order_by="creation asc",
     )
 
-    pages.sort(key=lambda page: (priority_map.get(page.name, len(priority_map)), page.title or page.name))
+    page_map = {str(page.name): str(page.title or page.name) for page in pages if page.name not in HIDDEN_ROUTES}
+    route_names = [route for route in DEFAULT_ROUTE_ORDER if route not in HIDDEN_ROUTES]
+    route_names.extend(
+        str(page.name)
+        for page in sorted(pages, key=lambda page: (priority_map.get(page.name, len(priority_map)), page.title or page.name))
+        if page.name not in HIDDEN_ROUTES and page.name not in route_names
+    )
 
     return [
         {
-            "label": str(page.title or page.name),
-            "route": str(page.name),
+            "label": page_map.get(route, DEFAULT_ROUTE_LABELS.get(route, route)),
+            "route": route,
         }
-        for page in pages
-        if page.name not in HIDDEN_ROUTES
+        for route in route_names
     ]

@@ -1,15 +1,15 @@
 {
  "content": null,
- "creation": "2026-04-13 00:00:00",
+ "creation": "2026-05-20 00:00:00",
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-05-20 15:22:01.913132",
+ "modified": "2026-05-20 00:00:00",
  "modified_by": "Administrator",
  "module": "Dashboards",
- "name": "comparison-by-product",
+ "name": "manufacture-dashboard",
  "owner": "Administrator",
- "page_name": "comparison-by-product",
+ "page_name": "manufacture-dashboard",
  "roles": [
   {
    "role": "investor"
@@ -22,5 +22,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Comparison by Product"
+ "title": "Производственный дашборд"
 }
