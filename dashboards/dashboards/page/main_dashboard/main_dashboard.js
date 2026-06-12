@@ -352,23 +352,10 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			</linearGradient>`;
 		}).join("")}</defs>`;
 
-		const paths = built
+		const segments = built
 			.map((seg) => {
 				if (seg.span < 0.3) return "";
-				const dx = (10 * Math.cos(toRad(seg.mid))).toFixed(2);
-				const dy = (10 * Math.sin(toRad(seg.mid))).toFixed(2);
 				const d = arcPath(seg.start, seg.end);
-				// seg-hit stays in place (captures mouse), seg-vis moves on hover
-				return `<g class="mds-mb-segment" style="--tx:${dx}px;--ty:${dy}px">
-					<path class="mds-mb-seg-vis" d="${d}" fill="url(#${gid(seg.color)})"/>
-					<path class="mds-mb-seg-hit" d="${d}" fill="transparent"/>
-				</g>`;
-			})
-			.join("");
-
-		const connectors = built
-			.map((seg) => {
-				if (seg.span < 0.3) return "";
 				const mid = pt(OR, seg.mid);
 				const elbow = pt(ER, seg.mid);
 				const isRight = elbow.x >= CX;
@@ -377,10 +364,13 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 				const ey = elbow.y.toFixed(2);
 				const amtText = String(seg.amount).replace(/ UZS$/, "");
 				const labelX = isRight ? textX + 5 : textX - 5;
-				return [
-					`<polyline points="${mid.x.toFixed(1)},${mid.y.toFixed(1)} ${elbow.x.toFixed(1)},${ey} ${textX},${ey}" fill="none" stroke="${seg.color}" stroke-width="1.3"/>`,
-					`<text x="${labelX}" y="${(elbow.y + 5).toFixed(1)}" text-anchor="${anchor}" fill="${seg.color}" font-size="13" font-weight="700">${frappe.utils.escape_html(amtText)}</text>`,
-				].join("");
+				// hovering anywhere on the segment enlarges its number label
+				return `<g class="mds-mb-segment">
+					<path class="mds-mb-seg-vis" d="${d}" fill="url(#${gid(seg.color)})"/>
+					<polyline points="${mid.x.toFixed(1)},${mid.y.toFixed(1)} ${elbow.x.toFixed(1)},${ey} ${textX},${ey}" fill="none" stroke="${seg.color}" stroke-width="1.3"/>
+					<text class="mds-mb-amount-text" x="${labelX}" y="${(elbow.y + 5).toFixed(1)}" text-anchor="${anchor}" fill="${seg.color}">${frappe.utils.escape_html(amtText)}</text>
+					<path class="mds-mb-seg-hit" d="${d}" fill="transparent"/>
+				</g>`;
 			})
 			.join("");
 
@@ -390,9 +380,8 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 		const svg = `<svg class="mds-mb-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
 			${defs}
-			${paths}
-			${connectors}
-			<text x="${CX}" y="${CY + 5}" text-anchor="middle" fill="${centerColor}" font-size="13" font-weight="700">${centerAmt}</text>
+			${segments}
+			<text x="${CX}" y="${CY + 5}" text-anchor="middle" fill="${centerColor}" font-size="17" font-weight="700">${centerAmt}</text>
 		</svg>`;
 
 		const fmtAmt = (s) => frappe.utils.escape_html(String(s || "").replace(/ UZS$/, " сум"));
@@ -644,7 +633,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 						)
 						.join("")}
 				</div>
-				<div class="mds-profit-bars" style="grid-template-columns: repeat(${profitData.length || 1}, minmax(72px, 1fr));">
+				<div class="mds-profit-bars" style="grid-template-columns: repeat(${profitData.length || 1}, minmax(54px, 1fr));">
 					${profitData
 						.map((row) => {
 							const profitValue = Number(row.profit || 0);

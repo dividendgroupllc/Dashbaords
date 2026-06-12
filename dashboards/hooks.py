@@ -181,6 +181,7 @@ fixtures = [
 	{"dt": "Custom Field", "filters": [["module", "=", "Dashboards"]]},
 	{"dt": "Property Setter", "filters": [["module", "=", "Dashboards"]]},
 	{"dt": "Client Script", "filters": [["module", "=", "Dashboards"]]},
+	{"dt": "Workspace", "filters": [["name", "in", ["Sotuv", "Ishlab chiqarish"]]]},
 ]
 
 # Overriding Methods
