@@ -1067,7 +1067,7 @@ def _get_expense_total_by_root(
         SELECT
             gle.posting_date,
             gle.company,
-            ABS(IFNULL(SUM(gle.debit - gle.credit), 0)) AS total
+            IFNULL(SUM(gle.debit - gle.credit), 0) AS total
         FROM `tabGL Entry` gle
         INNER JOIN `tabAccount` acc ON acc.name = gle.account
         WHERE gle.docstatus = 1
@@ -1088,6 +1088,8 @@ def _get_expense_total_by_root(
         as_dict=True,
     )
 
+    # Signed sum (debit - credit) matches the Profit and Loss Statement row for the
+    # same subtree; a per-day ABS would flip credit-heavy days and inflate the total.
     return sum(convert_company_currency_amount(row.total, row.posting_date, row.company) for row in rows)
 
 
@@ -1238,65 +1240,35 @@ def get_item_cogs_map(year: str | int | None, month: str | int | None = None) ->
     return get_gross_profit_item_cogs_map(year, month)
 
 
-def get_item_rcp_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:
+def get_product_rcp_per_kg(year: str | int | None, month: str | int | None = None) -> float:
     if not year:
-        return {}
+        return 0
 
     month_no = _month_number(month)
-    month_filter_sales = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
-    month_filter_stock = f" AND MONTH(se.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    month_filter = f" AND MONTH(se.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
 
-    sold_rows = frappe.db.sql(
+    manufactured_row = frappe.db.sql(
         f"""
-        SELECT
-            COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_key,
-            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        WHERE si.docstatus = 1
-          AND COALESCE(si.is_return, 0) = 0
-          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
-          {month_filter_sales}
-        GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар')
-        """,
-        as_dict=True,
-    )
-
-    manufactured_rows = frappe.db.sql(
-        f"""
-        SELECT
-            COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Неизвестный товар') AS item_key,
-            SUM(COALESCE(sed.qty, 0)) AS qty
+        SELECT SUM(COALESCE(sed.qty, 0)) AS qty
         FROM `tabStock Entry` se
         INNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
         WHERE se.docstatus = 1
-          AND se.stock_entry_type = 'Manufacture'
-          AND sed.is_finished_item = 1
+          AND (se.stock_entry_type = 'Manufacture' OR se.purpose = 'Manufacture')
+          AND COALESCE(sed.is_finished_item, 0) = 1
           AND YEAR(se.posting_date) = {frappe.db.escape(year)}
-          {month_filter_stock}
-        GROUP BY COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Неизвестный товар')
+          {month_filter}
         """,
         as_dict=True,
-    )
+    )[0]
 
-    totals = get_rcp_totals(year, month)
-    total_sold_qty = sum(flt(row.qty) for row in sold_rows)
-    total_manufactured_qty = sum(flt(row.qty) for row in manufactured_rows)
-    item_rcp_map: dict[str, float] = {}
+    total_manufactured_qty = flt(manufactured_row.qty)
+    if not total_manufactured_qty:
+        return 0
 
-    for row in sold_rows:
-        qty = flt(row.qty)
-        item_rcp_map[row.item_key] = item_rcp_map.get(row.item_key, 0) + (
-            qty / total_sold_qty * totals["direct_total"] if total_sold_qty else 0
-        )
-
-    for row in manufactured_rows:
-        qty = flt(row.qty)
-        item_rcp_map[row.item_key] = item_rcp_map.get(row.item_key, 0) + (
-            qty / total_manufactured_qty * totals["indirect_total"] if total_manufactured_qty else 0
-        )
-
-    return item_rcp_map
+    # РСП ставка = Indirect Expenses (the monthly P&L row) per manufactured kg;
+    # production and sales items are unrelated in the Item master, so the rate is
+    # global rather than per item.
+    return flt(get_rcp_totals(year, month)["indirect_total"]) / total_manufactured_qty
 
 
 def get_item_bonus_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:

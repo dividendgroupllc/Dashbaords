@@ -9,7 +9,7 @@ from dashboards.dashboards.dashboard_data import (
 	MONTH_LABELS,
 	convert_to_reporting_currency,
 	get_item_cogs_map,
-	get_item_rcp_map,
+	get_product_rcp_per_kg,
 )
 
 
@@ -62,7 +62,7 @@ def _normalize_filters(year: str | None, month: str | None) -> tuple[str, str]:
 
 def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 	cogs_map = get_item_cogs_map(year, MONTH_MAP[month])
-	rcp_map = get_item_rcp_map(year, MONTH_MAP[month])
+	rcp_per_kg = get_product_rcp_per_kg(year, MONTH_MAP[month])
 	rows = frappe.db.sql(
 		"""
 		SELECT
@@ -115,7 +115,7 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 		sales = flt(row["sales"])
 		cost = flt(cogs_map.get(row["item_key"]))
 		margin = sales - cost
-		rsp = flt(rcp_map.get(row["item_key"]))
+		rsp = flt(row["kg"]) * rcp_per_kg
 		profit = margin - rsp
 		result.append(
 			{

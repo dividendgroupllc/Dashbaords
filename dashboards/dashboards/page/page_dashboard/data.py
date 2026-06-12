@@ -15,6 +15,7 @@ from dashboards.dashboards.dashboard_data import (
     get_cogs_total,
     get_item_cogs_map,
     get_monthly_sales_from_profit_and_loss,
+    get_product_rcp_per_kg,
     get_rcp_totals,
     get_sales_profit_and_loss_period_end,
 )
@@ -193,7 +194,7 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         sales_total = sum(flt(value) for value in monthly_sales.values())
 
     cost_total = flt(get_cogs_total(selected_year, month))
-    rcp_total = flt(rcp_totals["direct_total"])
+    rcp_total = flt(rcp_totals["indirect_total"])
     margin_total = sales_total - cost_total - rcp_total
     invoice_count = sum(flt(row.invoice_count) for row in invoice_totals)
     return_total = sum(
@@ -258,135 +259,11 @@ def get_returns_by_month(year: str | None = None) -> list[list[str]]:
     return [[MONTH_LABELS[month_no - 1], format_number(month_map[month_no])] for month_no in range(1, 13)]
 
 
-def _get_direct_expense_accounts() -> list[str]:
-    root_patterns = ["Direct Expenses", "Direct Expense", "Direct Expence"]
-    pattern_conditions = " OR ".join(
-        " OR ".join(
-            [
-                f"root_acc.name = {frappe.db.escape(pattern)}",
-                f"root_acc.name LIKE {frappe.db.escape(pattern + ' - %')}",
-                f"root_acc.name LIKE {frappe.db.escape('% - ' + pattern + ' - %')}",
-                f"root_acc.name LIKE {frappe.db.escape('% - ' + pattern)}",
-            ]
-        )
-        for pattern in root_patterns
-    )
-
-    rows = frappe.db.sql(
-        f"""
-        SELECT acc.name
-        FROM `tabAccount` acc
-        WHERE acc.disabled = 0
-          AND acc.is_group = 0
-          AND EXISTS (
-              SELECT 1
-              FROM `tabAccount` root_acc
-              WHERE ({pattern_conditions})
-                AND acc.lft >= root_acc.lft
-                AND acc.rgt <= root_acc.rgt
-          )
-        """,
-        as_dict=True,
-    )
-    return [row.name for row in rows]
-
-
-def _get_direct_expense_total_in_reporting_currency(year: str, month: str | None = None) -> float:
-    accounts = _get_direct_expense_accounts()
-    if not accounts:
-        return flt(get_rcp_totals(year, month)["direct_total"])
-
-    account_filter = ", ".join(frappe.db.escape(account) for account in accounts)
-    month_no = MONTH_LABELS.index(month) + 1 if month in MONTH_LABELS else None
-    month_filter = f" AND MONTH(gle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
-    rows = frappe.db.sql(
-        f"""
-        SELECT
-            day_totals.posting_date,
-            day_totals.company,
-            CASE
-                WHEN company.default_currency = 'UZS' THEN day_totals.total
-                ELSE day_totals.total * COALESCE(
-                    (
-                        SELECT ce.exchange_rate
-                        FROM `tabCurrency Exchange` ce
-                        WHERE ce.from_currency = company.default_currency
-                          AND ce.to_currency = 'UZS'
-                          AND ce.date <= day_totals.posting_date
-                        ORDER BY ce.date DESC
-                        LIMIT 1
-                    ),
-                    (
-                        SELECT 1 / ce.exchange_rate
-                        FROM `tabCurrency Exchange` ce
-                        WHERE ce.from_currency = 'UZS'
-                          AND ce.to_currency = company.default_currency
-                          AND ce.date <= day_totals.posting_date
-                          AND COALESCE(ce.exchange_rate, 0) != 0
-                        ORDER BY ce.date DESC
-                        LIMIT 1
-                    ),
-                    1
-                )
-            END AS total
-        FROM (
-            SELECT
-                gle.posting_date,
-                gle.company,
-                ABS(IFNULL(SUM(gle.debit - gle.credit), 0)) AS total
-            FROM `tabGL Entry` gle
-            WHERE gle.docstatus = 1
-              AND gle.is_cancelled = 0
-              AND gle.account IN ({account_filter})
-              AND YEAR(gle.posting_date) = %(year)s
-              {month_filter}
-            GROUP BY gle.posting_date, gle.company
-        ) day_totals
-        INNER JOIN `tabCompany` company ON company.name = day_totals.company
-        """,
-        {"year": int(year)},
-        as_dict=True,
-    )
-    if not rows:
-        return flt(get_rcp_totals(year, month)["direct_total"])
-
-    return sum(flt(row.total) for row in rows)
-
-
-def _get_product_rcp_per_kg(year: str, month: str | None = None) -> float:
-    clause, params = _period_clause(year, month, alias="se")
-    manufactured_rows = frappe.db.sql(
-        f"""
-        SELECT
-            COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Неизвестный товар') AS item_code,
-            COALESCE(NULLIF(sed.item_name, ''), sed.item_code, 'Неизвестный товар') AS item_label,
-            SUM(COALESCE(sed.qty, 0)) AS manufactured_qty
-        FROM `tabStock Entry` se
-        INNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
-        WHERE se.docstatus = 1
-          AND (se.stock_entry_type = 'Manufacture' OR se.purpose = 'Manufacture')
-          AND COALESCE(sed.is_finished_item, 0) = 1
-          {clause}
-        GROUP BY
-            COALESCE(NULLIF(sed.item_code, ''), NULLIF(sed.item_name, ''), 'Неизвестный товар'),
-            COALESCE(NULLIF(sed.item_name, ''), sed.item_code, 'Неизвестный товар')
-        """,
-        params,
-        as_dict=True,
-    )
-
-    total_manufactured_qty = sum(flt(row.manufactured_qty) for row in manufactured_rows)
-    direct_total = _get_direct_expense_total_in_reporting_currency(year, month)
-    rcp_per_kg = direct_total / total_manufactured_qty if total_manufactured_qty else 0
-
-    return rcp_per_kg
-
-
 def get_product_margin_rows(year: str | None = None, month: str | None = None, limit: int | None = None) -> list[list[str | bool]]:
     selected_year = year or get_default_year()
     clause, params = _period_clause(selected_year, month, alias="si")
     report_end_date = _period_end_date(selected_year, month)
-    rcp_per_kg = _get_product_rcp_per_kg(selected_year, month)
+    rcp_per_kg = get_product_rcp_per_kg(selected_year, month)
     product_cogs_amounts = get_item_cogs_map(selected_year, month)
 
     rows = frappe.db.sql(
@@ -451,7 +328,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
     total_net_margin = sum(flt(row["net_margin"]) for row in values)
     total_sales = sum(flt(row["sales"]) for row in values)
     total_profitability = (total_margin / total_sales * 100) if total_sales else 0
-    total_rsp_percent = (total_sales / total_rsp * 100) if total_rsp else 0
+    total_rsp_percent = (total_rsp / total_sales * 100) if total_sales else 0
 
     result = [
         [
@@ -461,7 +338,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(row["cost"]),
             format_number(row["margin"]),
             format_number(row["rsp"]),
-            f"{((flt(row['sales']) / flt(row['rsp'])) * 100) if flt(row['rsp']) else 0:.1f}%".replace(".", ","),
+            f"{((flt(row['rsp']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
             format_number(row["net_margin"]),
             f"{((flt(row['margin']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
         ]
