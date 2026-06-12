@@ -93,14 +93,12 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 						<section class="mds-card mds-balance-card">
 							<div data-region="balance-details"></div>
 						</section>
-						<div class="mds-stack-column">
-							<section class="mds-card mds-break-card">
-								<div data-region="unit-cost"></div>
-							</section>
-							<section class="mds-card mds-health-panel">
-								<div data-region="business-health"></div>
-							</section>
-						</div>
+						<section class="mds-card mds-break-card">
+							<div data-region="unit-cost"></div>
+						</section>
+						<section class="mds-card mds-health-panel">
+							<div data-region="business-health"></div>
+						</section>
 						<section class="mds-card mds-returns-card">
 							<h2>АНАЛИЗ ВОЗВРАТОВ</h2>
 							<div class="mds-return-chart" data-region="return-chart"></div>
@@ -265,17 +263,17 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			<div class="mds-return-table">
 				<div class="mds-return-table-head">
 					<span>Месяц</span>
-					<span>Тонна</span>
+					<span>Кг</span>
 					<span>Сумма</span>
 				</div>
 				<div class="mds-return-table-body">
 					${this.months
 						.map((month, index) => {
-							const row = returnData[index] || { tons_display: "", amount_display: "" };
+							const row = returnData[index] || { kg_display: "", amount_display: "" };
 							return `
 								<div class="mds-return-table-row ${month === this.state.month ? "is-active" : ""}">
 									<span>${frappe.utils.escape_html(this.fullMonthLabels[month] || month)}</span>
-									<strong>${frappe.utils.escape_html(row.tons_display || "0t")}</strong>
+									<strong>${frappe.utils.escape_html(row.kg_display || "0 кг")}</strong>
 									<strong>${frappe.utils.escape_html(row.amount_display || "0")}</strong>
 								</div>
 							`;
@@ -614,7 +612,6 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_profit_chart() {
 		const profitData = this.data?.net_profit_profitability?.series || [];
 		const maxProfitValue = Math.max(100, ...profitData.map((row) => Number(row.profit || 0)));
-		const maxProfitabilityValue = Math.max(10, ...profitData.map((row) => Number(row.profitability || 0)));
 		const axisPadding = Math.max(maxProfitValue * 0.2, 10);
 		const axisTop = Math.ceil((maxProfitValue + axisPadding) / 10) * 10;
 		const axisValues = [axisTop, axisTop * (2 / 3), axisTop * (1 / 3), 0];
@@ -653,7 +650,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 							const profitValue = Number(row.profit || 0);
 							const profitabilityValue = Number(row.profitability || 0);
 							const profitHeight = profitValue ? Math.max((profitValue / axisTop) * 100, 3) : 0;
-							const profitabilityHeight = profitabilityValue ? Math.max((profitabilityValue / maxProfitabilityValue) * 100, 3) : 0;
+							const profitabilityHeight = profitabilityValue ? Math.max(Math.min(profitabilityValue, 100), 3) : 0;
 							return `
 								<div class="mds-profit-group">
 									<div class="mds-profit-columns">

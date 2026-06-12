@@ -322,13 +322,13 @@ def _get_returns_analysis_data(year: str) -> dict[str, Any]:
     series = []
     for month_no, month_label in enumerate(SHORT_MONTHS, start=1):
         row = return_metrics[month_no]
-        tons = _to_tons(row["return_qty_total"])
+        kg = flt(row["return_qty_total"])
         amount = flt(row["return_amount"])
         series.append(
             {
                 "month": month_label,
-                "tons": round(tons, 2),
-                "tons_display": f"{round(tons, 1):g}t" if tons else "",
+                "kg": round(kg, 1),
+                "kg_display": f"{format_number(kg, precision=0)} кг" if kg else "",
                 "amount": amount,
                 "amount_display": _compact_number(amount) if amount else "",
             }

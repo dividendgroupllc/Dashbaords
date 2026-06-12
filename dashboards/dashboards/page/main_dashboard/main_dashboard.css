@@ -192,20 +192,14 @@
 
 .mds-average-card,
 .mds-balance-card {
-	grid-column: span 4;
+	grid-column: span 6;
 	padding: 30px;
-}
-
-.mds-stack-column {
-	grid-column: span 4;
-	display: grid;
-	gap: 14px;
-	align-content: start;
 }
 
 .mds-break-card,
 .mds-health-panel {
-	padding: 24px;
+	grid-column: span 6;
+	padding: 30px;
 }
 
 .mds-returns-card {
@@ -1382,6 +1376,7 @@
 	.mds-average-card,
 	.mds-balance-card,
 	.mds-break-card,
+	.mds-health-panel,
 	.mds-returns-card,
 	.mds-profit-card {
 		grid-column: span 6;
@@ -1431,6 +1426,7 @@
 	.mds-average-card,
 	.mds-balance-card,
 	.mds-break-card,
+	.mds-health-panel,
 	.mds-returns-card,
 	.mds-profit-card {
 		grid-column: span 1;
