@@ -83,7 +83,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 						</section>
 						<section class="mds-card mds-card--donut">
 							<div class="mds-card-head">
-								<h2>Маржа и бонус</h2>
+								<h2>Чистая прибыль ва харажатлар</h2>
 							</div>
 							<div data-region="margin-bonus"></div>
 						</section>
@@ -304,12 +304,10 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
 
-		// Segment order clockwise from 12 o'clock: Net Profit → Margin → Bonus → Marketing
+		// Segment order clockwise from 12 o'clock: Net Profit → Харажатлар
 		const SEGS = [
 			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#dc2626" },
-			{ label: "Маржа",          pct: Number(data.margin_percent || 0),      amount: data.margin_amount_display || "0 UZS",     pctDisp: data.margin_percent_display || "0%",     color: "#2563eb" },
-			{ label: "Бонус",          pct: Number(data.bonus_percent || 0),       amount: data.bonus_amount_display || "0 UZS",      pctDisp: data.bonus_percent_display || "0%",      color: "#22c55e" },
-			{ label: "Маркетинг",      pct: Number(data.marketing_percent || 0),   amount: data.marketing_amount_display || "0 UZS",  pctDisp: data.marketing_percent_display || "0%",  color: "#f0b429" },
+			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0),  amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#f0b429" },
 		];
 
 		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
@@ -338,8 +336,6 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		// Per-color top-light gradient for 3D depth (light top → base → dark bottom)
 		const GRAD = {
 			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"],
-			"#2563eb": ["#93c5fd", "#2563eb", "#1e3a8a"],
-			"#22c55e": ["#86efac", "#22c55e", "#14532d"],
 			"#f0b429": ["#fde68a", "#f0b429", "#78350f"],
 		};
 		const gid = (c) => `mbg${c.replace("#", "")}`;
@@ -396,16 +392,8 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			)
 			.join("");
 
-		const totalAmt = fmtAmt(data.total_amount_display || "");
 		const legend = `<table class="mds-mb-legend">
 			<tbody>${rows}</tbody>
-			<tfoot>
-				<tr class="mds-mb-row mds-mb-row--total">
-					<td colspan="2" class="mds-mb-label-cell"><strong>Итого</strong></td>
-					<td class="mds-mb-amount-cell"><strong>${totalAmt}</strong></td>
-					<td class="mds-mb-pct-cell"><span class="mds-mb-badge mds-mb-badge--total">100%</span></td>
-				</tr>
-			</tfoot>
 		</table>`;
 
 		this.$marginBonus.html(`<div class="mds-mb-wrap">${svg}${legend}</div>`);
@@ -532,8 +520,8 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		const maxTotal = Math.max(1, ...series.map((r) => (r.total != null ? Math.abs(r.total) : 0)));
 		const formatFullMoney = (value) => {
 			const amount = Number(value || 0);
-			const rounded = Math.abs(amount - Math.round(amount)) < 0.005 ? Math.round(amount) : Number(amount.toFixed(2));
-			return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(rounded).replace(/,/g, " ")} UZS`;
+			const rounded = Math.round(amount);
+			return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(rounded).replace(/,/g, " ")} UZS`;
 		};
 		return `
 			<div class="mds-balance-trend">
