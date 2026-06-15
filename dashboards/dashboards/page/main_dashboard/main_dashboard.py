@@ -7,6 +7,7 @@ from typing import Any
 import frappe
 from frappe.utils import cint, flt, get_last_day, getdate, today
 
+from dashboards.dashboards.cache import dashboard_cache
 from dashboards.dashboards.dashboard_data import (
     convert_company_currency_amount,
     convert_to_reporting_currency,
@@ -454,24 +455,31 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     from_date, to_date = _get_period_window(year, month)
     harajatlar_value = abs(flt(get_fixed_cost_total_for_period(from_date, to_date)))
     net_profit_value = flt(get_monthly_net_profit_from_profit_and_loss(year).get(_month_no(month) or 0))
+    tannarx_value = abs(flt(get_cogs_total_for_period(from_date, to_date)))
     # Use absolute sum as denominator so chart always renders when any value is non-zero.
     # The signed sum can equal zero when a negative value cancels positive values.
-    abs_denominator = abs(harajatlar_value) + abs(net_profit_value)
+    abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value)
     harajatlar_percent = round(_safe_div(harajatlar_value * 100, abs_denominator), 1) if abs_denominator else 0
     net_profit_percent = round(_safe_div(net_profit_value * 100, abs_denominator), 1) if abs_denominator else 0
+    tannarx_percent = round(_safe_div(tannarx_value * 100, abs_denominator), 1) if abs_denominator else 0
     return {
         "harajatlar_value": harajatlar_value,
         "net_profit_value": net_profit_value,
+        "tannarx_value": tannarx_value,
         "harajatlar_percent": harajatlar_percent,
         "net_profit_percent": net_profit_percent,
+        "tannarx_percent": tannarx_percent,
         "harajatlar_amount_display": f"{_compact_money_label(harajatlar_value)} UZS",
         "net_profit_amount_display": f"{_compact_money_label(net_profit_value)} UZS",
+        "tannarx_amount_display": f"{_compact_money_label(tannarx_value)} UZS",
         "harajatlar_percent_display": f"{harajatlar_percent:.1f}%",
         "net_profit_percent_display": f"{net_profit_percent:.1f}%",
+        "tannarx_percent_display": f"{tannarx_percent:.1f}%",
         "center_value": f"{int(round(net_profit_percent))}%",
         "center_label": "Чистая прибыль",
         "harajatlar_display": f"Харажатлар ({harajatlar_percent:g}%)",
         "net_profit_display": f"Чистая прибыль ({net_profit_percent:g}%)",
+        "tannarx_display": f"Тан нарх ({tannarx_percent:g}%)",
     }
 
 
@@ -1007,7 +1015,11 @@ def _get_break_even_data(year: str, month: str) -> dict[str, Any]:
 
 
 @frappe.whitelist()
+@dashboard_cache("main_dashboard")
 def get_dashboard_data(year: str | None = None, month: str | None = None) -> dict[str, Any]:
+    # These clears now run only on a Redis cache miss (the decorator serves hits without
+    # entering this function). They keep the per-process lru_caches from returning stale
+    # figures when a miss-path recompute happens after an event invalidation.
     _get_monthly_sales_metrics.cache_clear()
     _get_monthly_return_metrics.cache_clear()
     _get_period_totals.cache_clear()

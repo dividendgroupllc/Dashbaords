@@ -3,8 +3,6 @@ from __future__ import annotations
 import calendar
 from typing import Any
 
-import json
-
 import frappe
 from frappe.utils import cint, flt, format_datetime, get_first_day, get_last_day, getdate, now_datetime, today
 
@@ -18,6 +16,9 @@ _SALES_ACCOUNT_CACHE: list[str] | None = None
 _STOCK_ACCOUNT_CACHE: list[str] | None = None
 _MONTHLY_SALES_PL_CACHE: dict[str, dict[int, float]] = {}
 _MONTHLY_NET_PROFIT_PL_CACHE: dict[str, dict[int, float]] = {}
+# Memoizes the Profit & Loss report (columns, data) per (company, year) so the sales row
+# and the net-profit row are extracted from a single report execution instead of two.
+_PL_REPORT_CACHE: dict[tuple[str, str], tuple[list, list]] = {}
 _TARGET_DEBTOR_ACCOUNT = "Debtors UZS - P"
 _TARGET_STOCK_ACCOUNT = "Склад сырьё - P"
 _TARGET_STOCK_ACCOUNT_NUMBER = "1410"
@@ -435,26 +436,25 @@ def get_gl_accounts_total(account_names: list[str], period_end: str | None = Non
         return 0
 
     to_date = str(getdate(period_end or today()))
-    from erpnext.accounts.report.general_ledger import general_ledger
 
-    filters = frappe._dict(
-        {
-            "company": company,
-            "from_date": "2000-01-01",
-            "to_date": to_date,
-            "account": json.dumps(account_names),
-            "presentation_currency": REPORTING_CURRENCY,
-        }
-    )
-    _columns, rows = general_ledger.execute(filters)
+    # Closing balance is the cumulative (debit - credit) up to to_date. A single indexed
+    # aggregate replaces a full general_ledger report execution that previously rebuilt the
+    # whole ledger from 2000-01-01 on every balance card open.
+    balance = frappe.db.sql(
+        """
+        SELECT SUM(COALESCE(debit, 0) - COALESCE(credit, 0)) AS balance
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND account IN %(accounts)s
+          AND posting_date <= %(to_date)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        """,
+        {"company": company, "accounts": tuple(account_names), "to_date": to_date},
+        as_dict=True,
+    )[0].balance
 
-    closing_rows = [
-        row for row in rows if not row.get("posting_date") and "Closing" in str(row.get("account") or "")
-    ]
-    if closing_rows:
-        return flt(closing_rows[-1].get("balance"))
-
-    return 0
+    return convert_company_currency_amount(balance, to_date, company)
 
 
 def get_stock_total(period_end: str | None = None) -> float:
@@ -470,25 +470,26 @@ def get_gl_accounts_period_total(account_names: list[str], from_date: str, to_da
     if not company:
         return 0
 
-    from erpnext.accounts.report.general_ledger import general_ledger
+    from_date = str(getdate(from_date))
+    to_date = str(getdate(to_date))
 
-    filters = frappe._dict(
-        {
-            "company": company,
-            "from_date": str(getdate(from_date)),
-            "to_date": str(getdate(to_date)),
-            "account": json.dumps(account_names),
-            "presentation_currency": REPORTING_CURRENCY,
-        }
-    )
-    _columns, rows = general_ledger.execute(filters)
+    # Period movement is (credit - debit) over [from_date, to_date] — the report's "Total"
+    # row. A single indexed aggregate replaces the full general_ledger report execution.
+    total = frappe.db.sql(
+        """
+        SELECT SUM(COALESCE(credit, 0) - COALESCE(debit, 0)) AS total
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND account IN %(accounts)s
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        """,
+        {"company": company, "accounts": tuple(account_names), "from_date": from_date, "to_date": to_date},
+        as_dict=True,
+    )[0].total
 
-    total_rows = [row for row in rows if not row.get("posting_date") and str(row.get("account") or "").strip("'") == "Total"]
-    if not total_rows:
-        return 0
-
-    total_row = total_rows[-1]
-    return flt(total_row.get("credit")) - flt(total_row.get("debit"))
+    return convert_company_currency_amount(total, to_date, company)
 
 
 def get_sales_total_for_period(from_date: str, to_date: str) -> float:
@@ -518,17 +519,95 @@ def get_sales_profit_and_loss_period_end(year: str | int) -> Any:
         FROM `tabGL Entry`
         WHERE company = %(company)s
           AND account IN %(accounts)s
-          AND YEAR(posting_date) = %(year)s
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
           AND docstatus = 1
           AND is_cancelled = 0
         """,
         {
             "company": company,
             "accounts": tuple(sales_accounts),
-            "year": cint(year),
+            "from_date": f"{cint(year)}-01-01",
+            "to_date": f"{cint(year)}-12-31",
         },
         as_dict=True,
     )[0].posting_date
+
+
+_PL_MONTH_NO_BY_LABEL = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _map_pl_row_to_months(columns: list, target_row: dict | None) -> dict[int, float]:
+    """Spread a Profit & Loss report row's monthly columns into a {1..12: amount} map."""
+    month_map = {month_no: 0.0 for month_no in range(1, 13)}
+    if not target_row:
+        return month_map
+    for column in columns:
+        fieldname = str(column.get("fieldname") or "")
+        if "_" not in fieldname:
+            continue
+        month_no = _PL_MONTH_NO_BY_LABEL.get(fieldname.split("_", 1)[0])
+        if month_no:
+            month_map[month_no] = flt(target_row.get(fieldname))
+    return month_map
+
+
+def _get_company_year_period_end(company: str, year: str | int) -> Any:
+    """Latest submitted GL posting date for a company within a year (range filter so the
+    posting_date index can be used)."""
+    return frappe.db.sql(
+        """
+        SELECT MAX(posting_date) AS posting_date
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        """,
+        {"company": company, "from_date": f"{cint(year)}-01-01", "to_date": f"{cint(year)}-12-31"},
+        as_dict=True,
+    )[0].posting_date
+
+
+def _get_profit_and_loss_report(company: str, year: str | int) -> tuple[list, list]:
+    """Run the monthly Profit & Loss report once per (company, year) and memoize it.
+
+    The sales card and the net-profit card both read from this single execution. The
+    period end is the company's latest posting date for the year, which fully covers the
+    sales months (sales entries are GL entries, so the overall max is never earlier)."""
+    cache_key = (company, str(year))
+    cached = _PL_REPORT_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    period_end = _get_company_year_period_end(company, year)
+    if not period_end:
+        _PL_REPORT_CACHE[cache_key] = ([], [])
+        return [], []
+
+    from erpnext.accounts.report.profit_and_loss_statement import profit_and_loss_statement
+    from erpnext.accounts.utils import get_fiscal_year
+
+    fiscal_year = get_fiscal_year(period_end, company=company)[0]
+    filters = frappe._dict(
+        {
+            "company": company,
+            "from_fiscal_year": fiscal_year,
+            "to_fiscal_year": fiscal_year,
+            "period_start_date": f"{cint(year)}-01-01",
+            "period_end_date": str(getdate(period_end)),
+            "filter_based_on": "Date Range",
+            "periodicity": "Monthly",
+            "accumulated_values": 0,
+            "include_default_book_entries": 1,
+            "presentation_currency": REPORTING_CURRENCY,
+        }
+    )
+    columns, data, *_rest = profit_and_loss_statement.execute(filters)
+    _PL_REPORT_CACHE[cache_key] = (columns, data)
+    return columns, data
 
 
 def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
@@ -543,33 +622,7 @@ def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
         _MONTHLY_SALES_PL_CACHE[year_key] = month_map
         return month_map
 
-    latest_posting_date = get_sales_profit_and_loss_period_end(year)
-
-    if not latest_posting_date:
-        month_map = {month_no: 0.0 for month_no in range(1, 13)}
-        _MONTHLY_SALES_PL_CACHE[year_key] = month_map
-        return month_map
-
-    from erpnext.accounts.report.profit_and_loss_statement import profit_and_loss_statement
-    from erpnext.accounts.utils import get_fiscal_year
-
-    fiscal_year = get_fiscal_year(latest_posting_date, company=company)[0]
-
-    filters = frappe._dict(
-        {
-            "company": company,
-            "from_fiscal_year": fiscal_year,
-            "to_fiscal_year": fiscal_year,
-            "period_start_date": f"{cint(year)}-01-01",
-            "period_end_date": str(getdate(latest_posting_date)),
-            "filter_based_on": "Date Range",
-            "periodicity": "Monthly",
-            "accumulated_values": 0,
-            "include_default_book_entries": 1,
-            "presentation_currency": REPORTING_CURRENCY,
-        }
-    )
-    columns, data, *_rest = profit_and_loss_statement.execute(filters)
+    columns, data = _get_profit_and_loss_report(company, year)
 
     target_row = None
     for row in data:
@@ -581,32 +634,7 @@ def get_monthly_sales_from_profit_and_loss(year: str) -> dict[int, float]:
             target_row = row
             break
 
-    month_map = {month_no: 0.0 for month_no in range(1, 13)}
-    if target_row:
-        for column in columns:
-            fieldname = str(column.get("fieldname") or "")
-            if "_" not in fieldname:
-                continue
-            month_label = fieldname.split("_", 1)[0]
-            try:
-                month_no = {
-                    "jan": 1,
-                    "feb": 2,
-                    "mar": 3,
-                    "apr": 4,
-                    "may": 5,
-                    "jun": 6,
-                    "jul": 7,
-                    "aug": 8,
-                    "sep": 9,
-                    "oct": 10,
-                    "nov": 11,
-                    "dec": 12,
-                }[month_label]
-            except KeyError:
-                continue
-            month_map[month_no] = flt(target_row.get(fieldname))
-
+    month_map = _map_pl_row_to_months(columns, target_row)
     _MONTHLY_SALES_PL_CACHE[year_key] = month_map
     return month_map
 
@@ -622,75 +650,14 @@ def get_monthly_net_profit_from_profit_and_loss(year: str) -> dict[int, float]:
         _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
         return month_map
 
-    latest_posting_date = frappe.db.sql(
-        """
-        SELECT MAX(posting_date) AS posting_date
-        FROM `tabGL Entry`
-        WHERE company = %(company)s
-          AND YEAR(posting_date) = %(year)s
-          AND docstatus = 1
-          AND is_cancelled = 0
-        """,
-        {"company": company, "year": cint(year)},
-        as_dict=True,
-    )[0].posting_date
-
-    if not latest_posting_date:
-        month_map = {month_no: 0.0 for month_no in range(1, 13)}
-        _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
-        return month_map
-
-    from erpnext.accounts.report.profit_and_loss_statement import profit_and_loss_statement
-    from erpnext.accounts.utils import get_fiscal_year
-
-    fiscal_year = get_fiscal_year(latest_posting_date, company=company)[0]
-    filters = frappe._dict(
-        {
-            "company": company,
-            "from_fiscal_year": fiscal_year,
-            "to_fiscal_year": fiscal_year,
-            "period_start_date": f"{cint(year)}-01-01",
-            "period_end_date": str(getdate(latest_posting_date)),
-            "filter_based_on": "Date Range",
-            "periodicity": "Monthly",
-            "accumulated_values": 0,
-            "include_default_book_entries": 1,
-            "presentation_currency": REPORTING_CURRENCY,
-        }
-    )
-    columns, data, *_rest = profit_and_loss_statement.execute(filters)
+    columns, data = _get_profit_and_loss_report(company, year)
 
     target_row = next(
         (row for row in data if str(row.get("account") or "").strip("'") == "Profit for the year"),
         None,
     )
 
-    month_map = {month_no: 0.0 for month_no in range(1, 13)}
-    if target_row:
-        for column in columns:
-            fieldname = str(column.get("fieldname") or "")
-            if "_" not in fieldname:
-                continue
-            month_label = fieldname.split("_", 1)[0]
-            try:
-                month_no = {
-                    "jan": 1,
-                    "feb": 2,
-                    "mar": 3,
-                    "apr": 4,
-                    "may": 5,
-                    "jun": 6,
-                    "jul": 7,
-                    "aug": 8,
-                    "sep": 9,
-                    "oct": 10,
-                    "nov": 11,
-                    "dec": 12,
-                }[month_label]
-            except KeyError:
-                continue
-            month_map[month_no] = flt(target_row.get(fieldname))
-
+    month_map = _map_pl_row_to_months(columns, target_row)
     _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
     return month_map
 
@@ -983,8 +950,15 @@ def get_gross_profit_item_cogs_map(
     result: dict[str, float] = {}
 
     if invoices:
+        # Batch the invoice -> company lookup instead of one frappe.db.get_value per invoice.
+        invoice_companies = {
+            row.name: row.company
+            for row in frappe.get_all(
+                "Sales Invoice", filters={"name": ("in", invoices)}, fields=["name", "company"]
+            )
+        }
         for invoice in invoices:
-            invoice_company = frappe.db.get_value("Sales Invoice", invoice, "company")
+            invoice_company = invoice_companies.get(invoice)
             if not invoice_company:
                 continue
             columns, rows = _get_gross_profit_rows_for_company(

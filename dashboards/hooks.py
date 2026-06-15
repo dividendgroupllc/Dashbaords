@@ -148,6 +148,17 @@ app_include_js = "/assets/dashboards/js/dashboard_navigation.js?v=20260428-sideb
 # 	}
 # }
 
+# Invalidate cached dashboard payloads whenever a ledger-affecting document changes,
+# so dashboards reflect new invoices/payments on the next open (see dashboards/cache.py).
+doc_events = {
+	dt: {
+		"on_submit": "dashboards.dashboards.cache.on_ledger_change",
+		"on_cancel": "dashboards.dashboards.cache.on_ledger_change",
+		"on_update_after_submit": "dashboards.dashboards.cache.on_ledger_change",
+	}
+	for dt in ("Sales Invoice", "Payment Entry", "Journal Entry", "Stock Ledger Entry")
+}
+
 # Scheduled Tasks
 # ---------------
 
@@ -168,6 +179,14 @@ app_include_js = "/assets/dashboards/js/dashboard_navigation.js?v=20260428-sideb
 # 		"dashboards.tasks.monthly"
 # 	],
 # }
+
+# Keep the current-period dashboard caches warm so even the first open after a TTL
+# expiry or an invalidation is fast (see dashboards/cache.py).
+scheduler_events = {
+	"hourly": [
+		"dashboards.dashboards.cache.warm_current_period",
+	],
+}
 
 # Testing
 # -------

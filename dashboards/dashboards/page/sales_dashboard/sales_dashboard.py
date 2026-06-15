@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 from frappe.utils import flt, getdate, today
 
 from dashboards.dashboards.dashboard_data import (
@@ -134,6 +135,7 @@ def _get_product_rows(year: str, month: str) -> list[dict[str, Any]]:
 
 
 @frappe.whitelist()
+@dashboard_cache("sales_dashboard")
 def get_dashboard_context(year: str | None = None, month: str | None = None):
 	selected_year, selected_month = _normalize_filters(year, month)
 

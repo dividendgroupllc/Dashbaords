@@ -304,10 +304,11 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
 
-		// Segment order clockwise from 12 o'clock: Net Profit → Харажатлар
+		// Segment order clockwise from 12 o'clock: Net Profit → Тан нарх → Харажатлар
 		const SEGS = [
-			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#dc2626" },
-			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0),  amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#f0b429" },
+			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#16a34a" },
+			{ label: "Тан нарх",       pct: Number(data.tannarx_percent || 0),    amount: data.tannarx_amount_display || "0 UZS",    pctDisp: data.tannarx_percent_display || "0%",    color: "#3b82f6" },
+			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0), amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#dc2626" },
 		];
 
 		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
@@ -335,8 +336,9 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 		// Per-color top-light gradient for 3D depth (light top → base → dark bottom)
 		const GRAD = {
-			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"],
-			"#f0b429": ["#fde68a", "#f0b429", "#78350f"],
+			"#16a34a": ["#86efac", "#16a34a", "#14532d"], // green – чистая прибыль
+			"#3b82f6": ["#93c5fd", "#3b82f6", "#1e3a8a"], // blue  – тан нарх
+			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red   – харажатлар
 		};
 		const gid = (c) => `mbg${c.replace("#", "")}`;
 		const defs = `<defs>${SEGS.map((seg) => {

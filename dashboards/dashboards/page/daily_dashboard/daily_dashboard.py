@@ -4,6 +4,7 @@ from calendar import monthrange
 from typing import Any
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 from frappe.utils import flt, getdate, today
 
 from dashboards.dashboards.dashboard_data import (
@@ -268,6 +269,7 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 
 
 @frappe.whitelist()
+@dashboard_cache("daily_dashboard")
 def get_dashboard_context(
 	year: str | None = None,
 	month: str | None = None,

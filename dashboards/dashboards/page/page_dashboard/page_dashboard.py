@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 
 from dashboards.dashboards.page.page_dashboard.data import (
     get_avg_check_chart_data,
@@ -73,6 +74,7 @@ def _format_kpi_totals(year: str, month: str | None = None) -> dict[str, str]:
 
 
 @frappe.whitelist()
+@dashboard_cache("page_dashboard")
 def get_dashboard_context(year: str | None = None, month: str | None = None):
     years = get_dashboard_years()
     default_year = get_default_year()

@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 from frappe.utils import flt, getdate, today
 
 from dashboards.dashboards.dashboard_data import MONTH_LABELS
@@ -171,6 +172,7 @@ def _get_product_rows(
 
 
 @frappe.whitelist()
+@dashboard_cache("product_by_customer")
 def get_dashboard_context(customer: str | None = None):
     years = _get_selected_years(limit=4)
     reference_date = _get_reference_date()

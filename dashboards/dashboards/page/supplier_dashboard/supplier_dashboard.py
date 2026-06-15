@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 from frappe.utils import flt, get_first_day, get_last_day, getdate, today
 
 from dashboards.dashboards.dashboard_data import convert_company_currency_amount, convert_to_reporting_currency
@@ -405,6 +406,7 @@ def _build_party_rows(view: str, start_date: str, end_date: str, party: str | No
 
 
 @frappe.whitelist()
+@dashboard_cache("supplier_dashboard")
 def get_dashboard_context(year: str | None = None, month: str | None = None, view: str | None = None, party: str | None = None):
 	company_name, company_currency = _get_company_details()
 	selected_year, selected_month = _normalize_filters(year, month)

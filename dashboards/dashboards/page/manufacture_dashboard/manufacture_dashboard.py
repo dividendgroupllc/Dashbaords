@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Any
 
 import frappe
+from dashboards.dashboards.cache import dashboard_cache
 from frappe.utils import cint, flt, getdate, now_datetime, today
 
 from dashboards.dashboards.dashboard_data import (
@@ -368,6 +369,7 @@ def _build_monthly_series(metrics: dict[int, dict[str, float]]) -> list[dict[str
 
 
 @frappe.whitelist()
+@dashboard_cache("manufacture_dashboard")
 def get_dashboard_data(year: str | None = None, month: str | None = None) -> dict[str, Any]:
     _get_dashboard_years.cache_clear()
     _get_monthly_indirect_expense_from_profit_and_loss.cache_clear()
