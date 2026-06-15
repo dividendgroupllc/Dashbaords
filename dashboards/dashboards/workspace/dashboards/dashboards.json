@@ -65,16 +65,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "\u041f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u0434\u0430\u0448\u0431\u043e\u0440\u0434",
-   "link_count": 0,
-   "link_to": "manufacture-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "\u0414\u0430\u0448\u0431\u043e\u0440\u0434 \u043f\u043e \u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a\u0430\u043c",
    "link_count": 0,
    "link_to": "supplier-dashboard",
@@ -161,9 +151,19 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "\u041f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u0434\u0430\u0448\u0431\u043e\u0440\u0434",
+   "link_count": 0,
+   "link_to": "manufacture-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-05-13 02:12:18.626387",
+ "modified": "2026-06-15 19:20:21.241165",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "Dashboards",
@@ -181,7 +181,7 @@
    "role": "System Manager"
   }
  ],
- "sequence_id": 1.5,
+ "sequence_id": 2.0,
  "shortcuts": [],
  "title": "Dashboards"
 }
