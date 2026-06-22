@@ -1219,30 +1219,30 @@ def get_product_rcp_per_kg(year: str | int | None, month: str | int | None = Non
         return 0
 
     month_no = _month_number(month)
-    month_filter = f" AND MONTH(se.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    month_filter = f" AND MONTH(si.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
 
-    manufactured_row = frappe.db.sql(
+    sold_row = frappe.db.sql(
         f"""
-        SELECT SUM(COALESCE(sed.qty, 0)) AS qty
-        FROM `tabStock Entry` se
-        INNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
-        WHERE se.docstatus = 1
-          AND (se.stock_entry_type = 'Manufacture' OR se.purpose = 'Manufacture')
-          AND COALESCE(sed.is_finished_item, 0) = 1
-          AND YEAR(se.posting_date) = {frappe.db.escape(year)}
+        SELECT SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty
+        FROM `tabSales Invoice` si
+        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND COALESCE(si.is_return, 0) = 0
+          AND YEAR(si.posting_date) = {frappe.db.escape(year)}
           {month_filter}
         """,
         as_dict=True,
     )[0]
 
-    total_manufactured_qty = flt(manufactured_row.qty)
-    if not total_manufactured_qty:
+    total_sold_qty = flt(sold_row.qty)
+    if not total_sold_qty:
         return 0
 
-    # РСП ставка = Indirect Expenses (the monthly P&L row) per manufactured kg;
-    # production and sales items are unrelated in the Item master, so the rate is
-    # global rather than per item.
-    return flt(get_rcp_totals(year, month)["indirect_total"]) / total_manufactured_qty
+    # РСП ставка = Indirect Expenses (the monthly P&L row) per SOLD kg (сотилган кг,
+    # ишлаб чиқарилган эмас); production and sales items are unrelated in the Item
+    # master, so the rate is global rather than per item. Шу боис жадвал «RCP сумма»
+    # ИТОГО = сотилган кг × ставка = бутун Indirect Expenses (KPI «Сумма РСП» билан тенг).
+    return flt(get_rcp_totals(year, month)["indirect_total"]) / total_sold_qty
 
 
 def get_item_bonus_map(year: str | int | None, month: str | int | None = None) -> dict[str, float]:

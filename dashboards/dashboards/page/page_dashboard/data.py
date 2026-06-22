@@ -195,7 +195,9 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
 
     cost_total = flt(get_cogs_total(selected_year, month))
     rcp_total = flt(rcp_totals["indirect_total"])
-    margin_total = sales_total - cost_total - rcp_total
+    # «Маржа» KPI = yalpi marja (Сумма продаж − Себестоимость), jadval «Маржа»
+    # ustuni bilan mos kelishi uchun RCP bu yerda ayirilmaydi (РСП alohida kartada).
+    margin_total = sales_total - cost_total
     invoice_count = sum(flt(row.invoice_count) for row in invoice_totals)
     return_total = sum(
         convert_to_reporting_currency(
@@ -207,6 +209,18 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         for row in invoice_totals
     )
     kg_total = sum(flt(row.kg_total) for row in item_totals)
+    # «Сред.чек» raqamlovchisi: non-return Sales Invoice summalari yig'indisi
+    # (hujjatlar yig'indisi, return AYRILMAGAN). sales_total esa P&L netto qiymati
+    # (return ayrilgan) bo'lib qoladi — faqat avg_check shu manbadan farq qiladi.
+    invoice_sales_total = sum(
+        convert_to_reporting_currency(
+            row.get("sales_total"),
+            row.get("currency"),
+            sales_period_end or row.get("posting_date"),
+            row.get("company"),
+        )
+        for row in invoice_totals
+    )
 
     return {
         "sales_total": sales_total,
@@ -215,7 +229,7 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         "rsp_total": rcp_total,
         "return_total": return_total,
         "kg_total": kg_total,
-        "avg_check": sales_total / invoice_count if invoice_count else 0,
+        "avg_check": invoice_sales_total / invoice_count if invoice_count else 0,
     }
 
 
@@ -793,7 +807,7 @@ def get_avg_check_chart_data(year: str | None = None) -> dict[str, Any]:
     }
     return {
         "labels": MONTH_LABELS,
-        "datasets": [{"name": f"Сред чек {selected_year}", "values": [round(month_map[i]) for i in range(1, 13)]}],
+        "datasets": [{"name": f"Цена за кг {selected_year}", "values": [round(month_map[i]) for i in range(1, 13)]}],
     }
 
 

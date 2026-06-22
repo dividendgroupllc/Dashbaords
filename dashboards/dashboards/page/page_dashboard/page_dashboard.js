@@ -15,7 +15,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.selectedYear = null;
 		this.selectedMonth = null;
 		this.metricColumns = {
-			check_trend: { label: "Средний чек", totalLabel: "Макс" },
+			check_trend: { label: "Цена за кг", totalLabel: "Макс" },
 			price_trend: { label: "Средняя себестоимость", totalLabel: "Макс" },
 		};
 		this.regionPalette = [
