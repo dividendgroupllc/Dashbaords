@@ -35,7 +35,9 @@ def ensure_workspace_roles():
 
     workspace = frappe.get_doc("Workspace", "Dashboards")
     workspace.public = 1
-    workspace.module = "Dashboards"
+    # Dashboards workspace moduldan ajratilgan (module = NULL): u rol bo'yicha
+    # ko'rinadigan oddiy public workspace bo'lishi kerak, modul ruxsatiga bog'liq emas.
+    workspace.module = None
     workspace.icon = "chart"
     workspace.parent_page = ""
     workspace.sequence_id = 1.5
