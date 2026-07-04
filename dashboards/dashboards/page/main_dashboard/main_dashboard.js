@@ -390,7 +390,17 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		</svg>`;
 
 		const fmtAmt = (s) => frappe.utils.escape_html(String(s || "").replace(/ UZS$/, " сум"));
-		const rows = built
+		// Legend order is fixed (Сумма продаж → Тан нарх → Маржа → Харажатлар → Чистая прибыль);
+		// «Маржа» (= Сумма продаж − Тан нарх) is legend-only and has no donut segment.
+		const bySeg = Object.fromEntries(SEGS.map((seg) => [seg.label, seg]));
+		const legendRows = [
+			bySeg["Сумма продаж"],
+			bySeg["Тан нарх"],
+			{ label: "Маржа", amount: data.margin_amount_display || "0 UZS", pctDisp: data.margin_percent_display || "0%", color: "#8b5cf6" },
+			bySeg["Харажатлар"],
+			bySeg["Чистая прибыль"],
+		];
+		const rows = legendRows
 			.map(
 				(seg) => `<tr class="mds-mb-row">
 					<td class="mds-mb-dot-cell"><span class="mds-mb-dot" style="background:${seg.color}"></span></td>
