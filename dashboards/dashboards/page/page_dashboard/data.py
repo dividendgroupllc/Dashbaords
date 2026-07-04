@@ -316,7 +316,6 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
                 "cost": 0.0,
                 "rsp": 0.0,
                 "margin": 0.0,
-                "net_margin": 0.0,
             },
         )
         existing["qty"] += flt(row.qty_total)
@@ -331,7 +330,6 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
         )
         row["rsp"] = flt(row["qty"]) * rcp_per_kg
         row["margin"] = flt(row["sales"]) - flt(row["cost"])
-        row["net_margin"] = flt(row["margin"]) - flt(row["rsp"])
 
     sorted_values = sorted(values, key=lambda row: flt(row["qty"]), reverse=True)
     selected_values = sorted_values[:limit] if limit is not None else sorted_values
@@ -339,9 +337,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
     total_cost = sum(flt(row["cost"]) for row in values)
     total_rsp = sum(flt(row["rsp"]) for row in values)
     total_margin = sum(flt(row["margin"]) for row in values)
-    total_net_margin = sum(flt(row["net_margin"]) for row in values)
     total_sales = sum(flt(row["sales"]) for row in values)
-    total_profitability = (total_margin / total_sales * 100) if total_sales else 0
     total_rsp_percent = (total_rsp / total_sales * 100) if total_sales else 0
 
     result = [
@@ -353,8 +349,6 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(row["margin"]),
             # format_number(row["rsp"]),  # RCP сумма column hidden for now (kept for later use)
             f"{((flt(row['rsp']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
-            format_number(row["net_margin"]),
-            f"{((flt(row['margin']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
         ]
         for row in selected_values
     ]
@@ -367,8 +361,6 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(total_margin),
             # format_number(total_rsp),  # RCP сумма column hidden for now (kept for later use)
             f"{total_rsp_percent:.1f}%".replace(".", ","),
-            format_number(total_net_margin),
-            f"{total_profitability:.1f}%".replace(".", ","),
             True,
         ]
     )
@@ -543,7 +535,6 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
                 "margin": 0.0,
                 "bonus": 0.0,
                 "discount": 0.0,
-                "net_margin": 0.0,
             },
         )
         existing["sales"] += flt(row["sales"])
@@ -562,7 +553,6 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
                 "margin": 0.0,
                 "bonus": 0.0,
                 "discount": 0.0,
-                "net_margin": 0.0,
             },
         )
         existing["bonus"] += bonus_amount
@@ -571,21 +561,16 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
     for row in values:
         row["margin"] = flt(row["sales"]) - flt(row["cost"])
 
-    for row in values:
-        row["net_margin"] = flt(row["margin"]) - flt(row["bonus"])
-
     total_sales = sum(flt(row["sales"]) for row in values)
     total_cost = sum(flt(row["cost"]) for row in values)
     total_qty = sum(flt(row["qty"]) for row in values)
     total_bonus = sum(flt(row["bonus"]) for row in values)
     total_margin = sum(flt(row["margin"]) for row in values)
-    total_net_margin = sum(flt(row["net_margin"]) for row in values)
 
     result: list[list[str | bool]] = []
     for row in values:
         sales = flt(row["sales"])
         margin = flt(row["margin"])
-        net_margin = flt(row["net_margin"])
         result.append(
             [
                 str(row["client"]),
@@ -595,8 +580,6 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
                 format_number(margin),
                 format_number(row["bonus"]),
                 f"{(flt(row['bonus']) / margin * 100) if margin else 0:.1f}%".replace(".", ","),
-                format_number(net_margin),
-                f"{(margin / sales * 100) if sales else 0:.1f}%".replace(".", ","),
             ]
         )
 
@@ -609,8 +592,6 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
             format_number(total_margin),
             format_number(total_bonus),
             f"{(total_bonus / total_margin * 100) if total_margin else 0:.1f}%".replace(".", ","),
-            format_number(total_net_margin),
-            f"{(total_margin / total_sales * 100) if total_sales else 0:.1f}%".replace(".", ","),
             True,
         ]
     )
