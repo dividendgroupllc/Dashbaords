@@ -197,7 +197,7 @@
 }
 
 .mds-break-card,
-.mds-health-panel {
+.mds-calendar-card {
 	grid-column: span 6;
 	padding: 30px;
 }
@@ -544,139 +544,109 @@
 	color: var(--mds-red);
 }
 
-.mds-health-card {
-	display: grid;
-	gap: 14px;
-	margin-top: 16px;
-	padding: 18px 18px 16px;
-	border: 1px solid #e5ebf4;
-	border-radius: 12px;
-	background: linear-gradient(180deg, #fbfcff 0%, #f5f8fd 100%);
-}
-
-.mds-health-card--embedded {
-	margin-top: 26px;
-}
-
-.mds-health-panel h2 {
-	margin: 0 0 18px;
+.mds-calendar-card h2 {
+	margin: 0 0 14px;
 	font-size: 16px;
 	font-weight: 900;
 	letter-spacing: 0.09em;
 }
 
-.mds-health-head {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 12px;
-}
-
-.mds-health-head span,
-.mds-health-meta span {
-	display: block;
-	margin-bottom: 6px;
-	color: #6a7486;
-	font-size: 13px;
-	font-weight: 700;
-}
-
-.mds-health-head strong {
-	font-size: 28px;
-	line-height: 1;
-}
-
-.mds-health-head em {
-	display: inline-flex;
-	align-items: center;
-	padding: 7px 11px;
-	border-radius: 999px;
-	font-style: normal;
-	font-size: 12px;
-	font-weight: 900;
-	white-space: nowrap;
-}
-
-.mds-health-head .is-good {
-	background: #dff8ee;
-	color: #007a54;
-}
-
-.mds-health-head .is-warn {
-	background: #fff2cf;
-	color: #a66a00;
-}
-
-.mds-health-head .is-risk {
-	background: #fde7e7;
-	color: var(--mds-red);
-}
-
-.mds-health-bar {
-	position: relative;
-	padding-top: 14px;
-}
-
-.mds-health-scale {
-	height: 14px;
-	border-radius: 999px;
-	background: linear-gradient(90deg, #6ff4b2 0 30%, #ffe27a 30% 50%, #ff8a8a 50% 100%);
-	box-shadow: inset 0 1px 3px rgba(31, 48, 82, 0.14), 0 8px 18px rgba(31, 48, 82, 0.08);
-}
-
-.mds-health-pointer {
-	position: absolute;
-	top: 3px;
-	width: 8px;
-	height: 36px;
-	border-radius: 999px;
-	background: linear-gradient(180deg, #1f5ed0 0%, #0b5dc4 100%);
-	box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
-	transform: translateX(-50%);
-}
-
-.mds-health-ticks {
-	position: relative;
-	height: 16px;
-	color: #728198;
-	font-size: 11px;
+.mds-cal-title {
+	margin-bottom: 12px;
+	color: #2f2f2f;
+	font-size: 14px;
 	font-weight: 800;
+	text-align: center;
 }
 
-.mds-health-ticks span {
-	position: absolute;
-	top: 0;
-	transform: translateX(-50%);
-}
-
-.mds-health-ticks span:nth-child(1) {
-	left: 0;
-	transform: none;
-}
-
-.mds-health-ticks span:nth-child(2) {
-	left: 30%;
-}
-
-.mds-health-ticks span:nth-child(3) {
-	left: 50%;
-}
-
-.mds-health-ticks span:nth-child(4) {
-	left: 100%;
-	transform: translateX(-100%);
-}
-
-.mds-health-meta {
+.mds-cal-weekdays {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 12px;
-	padding-top: 6px;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	margin-bottom: 4px;
 }
 
-.mds-health-meta strong {
-	font-size: 16px;
-	line-height: 1.25;
+.mds-cal-weekday {
+	padding: 2px 0 4px;
+	color: #6a7486;
+	font-size: 11px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.mds-cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 2px;
+}
+
+.mds-cal-cell {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	min-height: 51px;
+	padding: 4px 5px;
+	border: 1px solid #e5ebf4;
+	border-radius: 4px;
+	background: #ffffff;
+}
+
+.mds-cal-cell.is-empty {
+	border-color: transparent;
+	background: transparent;
+}
+
+.mds-cal-cell.is-blank {
+	border-color: #e5ebf4;
+	background: #fff;
+}
+
+.mds-cal-day {
+	color: inherit;
+	font-size: 11px;
+	text-align: right;
+}
+
+.mds-cal-value {
+	color: inherit;
+	font-size: 11px;
+	font-weight: 700;
+	text-align: left;
+}
+
+.mds-cal-cell.is-blank .mds-cal-value {
+	color: transparent;
+}
+
+/* Debt heatmap: light red (low debt) -> dark red (high debt) */
+.mds-cal-cell.heat-1 {
+	background: #ffe5e5;
+}
+
+.mds-cal-cell.heat-2 {
+	background: #ffc7c7;
+}
+
+.mds-cal-cell.heat-3 {
+	background: #fa9a9a;
+}
+
+.mds-cal-cell.heat-4 {
+	background: #ef6360;
+}
+
+.mds-cal-cell.heat-5 {
+	background: #c4161c;
+}
+
+.mds-cal-cell.heat-1,
+.mds-cal-cell.heat-2,
+.mds-cal-cell.heat-3 {
+	color: #7f1d1d;
+}
+
+.mds-cal-cell.heat-4,
+.mds-cal-cell.heat-5 {
+	color: #ffffff;
 }
 
 .mds-balance-card,
@@ -1387,7 +1357,7 @@
 	.mds-average-card,
 	.mds-balance-card,
 	.mds-break-card,
-	.mds-health-panel,
+	.mds-calendar-card,
 	.mds-returns-card,
 	.mds-profit-card {
 		grid-column: span 6;
@@ -1437,7 +1407,7 @@
 	.mds-average-card,
 	.mds-balance-card,
 	.mds-break-card,
-	.mds-health-panel,
+	.mds-calendar-card,
 	.mds-returns-card,
 	.mds-profit-card {
 		grid-column: span 1;
@@ -1478,14 +1448,9 @@
 
 	.mds-price-row,
 	.mds-total-balance,
-	.mds-balance-sub,
-	.mds-health-head {
+	.mds-balance-sub {
 		align-items: flex-start;
 		flex-direction: column;
-	}
-
-	.mds-health-meta {
-		grid-template-columns: 1fr;
 	}
 
 	.mds-progress-head {

@@ -96,8 +96,11 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 						<section class="mds-card mds-break-card">
 							<div data-region="unit-cost"></div>
 						</section>
-						<section class="mds-card mds-health-panel">
-							<div data-region="business-health"></div>
+						<section class="mds-card mds-calendar-card">
+							<h2>ДОЛГ ПО ДНЯМ</h2>
+							<div class="mds-cal-title" data-region="cal-title"></div>
+							<div class="mds-cal-weekdays" data-region="cal-weekdays"></div>
+							<div class="mds-cal-grid" data-region="cal-grid"></div>
 						</section>
 						<section class="mds-card mds-returns-card">
 							<h2>АНАЛИЗ ВОЗВРАТОВ</h2>
@@ -133,7 +136,9 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.$averageCheck = this.page.main.find('[data-region="average-check"]');
 		this.$balanceDetails = this.page.main.find('[data-region="balance-details"]');
 		this.$unitCost = this.page.main.find('[data-region="unit-cost"]');
-		this.$businessHealth = this.page.main.find('[data-region="business-health"]');
+		this.$calTitle = this.page.main.find('[data-region="cal-title"]');
+		this.$calWeekdays = this.page.main.find('[data-region="cal-weekdays"]');
+		this.$calGrid = this.page.main.find('[data-region="cal-grid"]');
 	}
 
 	bind_events() {
@@ -215,7 +220,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.$averageCheck.html(loadingMarkup);
 		this.$balanceDetails.html(loadingMarkup);
 		this.$unitCost.html(loadingMarkup);
-		this.$businessHealth.html(loadingMarkup);
+		this.$calGrid.html(loadingMarkup);
 	}
 
 	render() {
@@ -226,7 +231,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		this.render_average_check();
 		this.render_balance_details();
 		this.render_unit_cost();
-		this.render_business_health_card();
+		this.render_debt_calendar();
 		this.render_profit_chart();
 	}
 
@@ -304,11 +309,12 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
 
-		// Segment order clockwise from 12 o'clock: Net Profit → Тан нарх → Харажатлар
+		// Segment order clockwise from 12 o'clock: Net Profit → Тан нарх → Харажатлар → Сумма продаж
 		const SEGS = [
 			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#16a34a" },
 			{ label: "Тан нарх",       pct: Number(data.tannarx_percent || 0),    amount: data.tannarx_amount_display || "0 UZS",    pctDisp: data.tannarx_percent_display || "0%",    color: "#3b82f6" },
 			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0), amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#dc2626" },
+			{ label: "Сумма продаж",   pct: Number(data.sales_percent || 0),      amount: data.sales_amount_display || "0 UZS",      pctDisp: data.sales_percent_display || "0%",      color: "#f59e0b" },
 		];
 
 		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
@@ -339,6 +345,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			"#16a34a": ["#86efac", "#16a34a", "#14532d"], // green – чистая прибыль
 			"#3b82f6": ["#93c5fd", "#3b82f6", "#1e3a8a"], // blue  – тан нарх
 			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red   – харажатлар
+			"#f59e0b": ["#fcd34d", "#f59e0b", "#92400e"], // amber – сумма продаж
 		};
 		const gid = (c) => `mbg${c.replace("#", "")}`;
 		const defs = `<defs>${SEGS.map((seg) => {
@@ -454,50 +461,54 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		`);
 	}
 
-	render_business_health() {
-		const data = this.data?.average_check || {};
-		const healthRatio = Number(data.health_ratio || 0);
-		const healthRatioCapped = Math.max(0, Math.min(100, Number(data.health_ratio_capped || 0)));
-		return `
-			<div class="mds-health-card mds-health-card--embedded">
-				<div class="mds-health-head">
-					<div>
-						<span>Состояние бизнеса</span>
-						<strong>${frappe.utils.escape_html(data.health_ratio_display || "0.0%")}</strong>
-					</div>
-					<em class="${healthRatio <= 30 ? "is-good" : healthRatio <= 50 ? "is-warn" : "is-risk"}">
-						Долг / Продажи
-					</em>
-				</div>
-				<div class="mds-health-bar">
-					<div class="mds-health-scale"></div>
-					<div class="mds-health-pointer" style="left: ${healthRatioCapped}%;"></div>
-				</div>
-				<div class="mds-health-ticks">
-					<span>0%</span>
-					<span>30%</span>
-					<span>50%</span>
-					<span>100%</span>
-				</div>
-				<div class="mds-health-meta">
-					<div>
-						<span>Продажи</span>
-						<strong>${frappe.utils.escape_html(data.health_sales_display || "0 UZS")}</strong>
-					</div>
-					<div>
-						<span>Долг</span>
-						<strong>${frappe.utils.escape_html(data.health_debt_display || "0 UZS")}</strong>
-					</div>
-				</div>
-			</div>
-		`;
+	getActiveDate() {
+		const monthIndex = this.months.indexOf(this.state.month);
+		return new Date(Number(this.state.year), monthIndex >= 0 ? monthIndex : 11, 1);
 	}
 
-	render_business_health_card() {
-		this.$businessHealth.html(`
-			<h2>СОСТОЯНИЕ БИЗНЕСА</h2>
-			${this.render_business_health()}
-		`);
+	getDebtHeatClass(value, values) {
+		const numericValues = Object.values(values).map(Number).filter((v) => v > 0);
+		const max = Math.max(...numericValues, 1);
+		const ratio = Number(value) / max;
+
+		if (ratio >= 0.85) return "heat-5";
+		if (ratio >= 0.65) return "heat-4";
+		if (ratio >= 0.45) return "heat-3";
+		if (ratio >= 0.2) return "heat-2";
+		return "heat-1";
+	}
+
+	render_debt_calendar() {
+		const calendar = this.data?.debt_calendar || {};
+		const values = calendar.values || {};
+		const labels = calendar.value_labels || {};
+		const date = this.getActiveDate();
+		const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+		const firstDayOffset = (date.getDay() + 6) % 7;
+		const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+		const cells = [];
+
+		for (let index = 0; index < firstDayOffset; index += 1) {
+			cells.push('<div class="mds-cal-cell is-empty"></div>');
+		}
+
+		for (let day = 1; day <= daysInMonth; day += 1) {
+			const hasValue = values[day] !== undefined && values[day] !== null;
+			const heatClass = hasValue ? this.getDebtHeatClass(values[day], values) : "is-blank";
+			const label = labels[day] || "";
+			cells.push(`
+				<div class="mds-cal-cell ${heatClass}">
+					<div class="mds-cal-day">${day}</div>
+					<div class="mds-cal-value">${frappe.utils.escape_html(label)}</div>
+				</div>
+			`);
+		}
+
+		this.$calTitle.text(`${this.fullMonthLabels[this.state.month] || this.state.month} ${this.state.year}`);
+		this.$calWeekdays.html(
+			weekdays.map((weekday) => `<div class="mds-cal-weekday">${frappe.utils.escape_html(weekday)}</div>`).join("")
+		);
+		this.$calGrid.html(cells.join(""));
 	}
 
 	render_balance_details() {

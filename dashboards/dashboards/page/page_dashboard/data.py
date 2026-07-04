@@ -351,7 +351,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(row["sales"]),
             format_number(row["cost"]),
             format_number(row["margin"]),
-            format_number(row["rsp"]),
+            # format_number(row["rsp"]),  # RCP сумма column hidden for now (kept for later use)
             f"{((flt(row['rsp']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
             format_number(row["net_margin"]),
             f"{((flt(row['margin']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
@@ -365,7 +365,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(total_sales),
             format_number(total_cost),
             format_number(total_margin),
-            format_number(total_rsp),
+            # format_number(total_rsp),  # RCP сумма column hidden for now (kept for later use)
             f"{total_rsp_percent:.1f}%".replace(".", ","),
             format_number(total_net_margin),
             f"{total_profitability:.1f}%".replace(".", ","),

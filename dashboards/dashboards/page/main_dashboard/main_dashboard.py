@@ -17,6 +17,7 @@ from dashboards.dashboards.dashboard_data import (
     get_cogs_total,
     get_creditor_total,
     get_debtor_balance_rows,
+    get_debtor_daily_balances,
     get_debtor_total,
     get_fixed_cost_total_for_period,
     get_monthly_net_profit_from_profit_and_loss,
@@ -456,30 +457,52 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     harajatlar_value = abs(flt(get_fixed_cost_total_for_period(from_date, to_date)))
     net_profit_value = flt(get_monthly_net_profit_from_profit_and_loss(year).get(_month_no(month) or 0))
     tannarx_value = abs(flt(get_cogs_total_for_period(from_date, to_date)))
+    sales_value = flt(get_monthly_sales_from_profit_and_loss(year).get(_month_no(month) or 0))
     # Use absolute sum as denominator so chart always renders when any value is non-zero.
     # The signed sum can equal zero when a negative value cancels positive values.
-    abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value)
+    abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value) + abs(sales_value)
     harajatlar_percent = round(_safe_div(harajatlar_value * 100, abs_denominator), 1) if abs_denominator else 0
     net_profit_percent = round(_safe_div(net_profit_value * 100, abs_denominator), 1) if abs_denominator else 0
     tannarx_percent = round(_safe_div(tannarx_value * 100, abs_denominator), 1) if abs_denominator else 0
+    sales_percent = round(_safe_div(sales_value * 100, abs_denominator), 1) if abs_denominator else 0
     return {
         "harajatlar_value": harajatlar_value,
         "net_profit_value": net_profit_value,
         "tannarx_value": tannarx_value,
+        "sales_value": sales_value,
         "harajatlar_percent": harajatlar_percent,
         "net_profit_percent": net_profit_percent,
         "tannarx_percent": tannarx_percent,
+        "sales_percent": sales_percent,
         "harajatlar_amount_display": f"{_compact_money_label(harajatlar_value)} UZS",
         "net_profit_amount_display": f"{_compact_money_label(net_profit_value)} UZS",
         "tannarx_amount_display": f"{_compact_money_label(tannarx_value)} UZS",
+        "sales_amount_display": f"{_compact_money_label(sales_value)} UZS",
         "harajatlar_percent_display": f"{harajatlar_percent:.1f}%",
         "net_profit_percent_display": f"{net_profit_percent:.1f}%",
         "tannarx_percent_display": f"{tannarx_percent:.1f}%",
+        "sales_percent_display": f"{sales_percent:.1f}%",
         "center_value": f"{int(round(net_profit_percent))}%",
         "center_label": "Чистая прибыль",
         "harajatlar_display": f"Харажатлар ({harajatlar_percent:g}%)",
         "net_profit_display": f"Чистая прибыль ({net_profit_percent:g}%)",
         "tannarx_display": f"Тан нарх ({tannarx_percent:g}%)",
+    }
+
+
+def _get_debt_calendar_data(year: str, month: str) -> dict[str, Any]:
+    """Per-day debtor balance for the debt-heatmap calendar on the main dashboard.
+
+    ``values`` is {day -> end-of-day debtor balance} and ``value_labels`` the compact display
+    strings. The calendar grid layout (weekday offset, days-in-month) is derived on the frontend
+    from the selected year+month, so no extra meta is needed here.
+    """
+    # main-dashboard months are 3-letter keys ("Jun"); dashboard_data resolves only full names,
+    # so pass the numeric month it accepts directly.
+    balances = get_debtor_daily_balances(year, _month_no(month))
+    return {
+        "values": balances,
+        "value_labels": {day: _compact_money_label(value) for day, value in balances.items()},
     }
 
 
@@ -1050,6 +1073,7 @@ def get_dashboard_data(year: str | None = None, month: str | None = None) -> dic
         "balance_details": _get_balance_details_data(selected_year, selected_month),
         "balance_trend": _get_balance_trend_data(selected_year, selected_month),
         "break_even": _get_break_even_data(selected_year, selected_month),
+        "debt_calendar": _get_debt_calendar_data(selected_year, selected_month),
         "unit_cost": _get_unit_cost_data(selected_year, selected_month),
         "returns_analysis": _get_returns_analysis_data(selected_year),
         "net_profit_profitability": _get_profitability_chart_data(selected_year),

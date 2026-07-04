@@ -183,7 +183,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.render_table(
 			"product-margin",
 			this.context.product_margin_rows || [],
-			["Товары", "Тонна", "Сумма продаж", "Сумма себ", "Маржа", "RCP сумма", "%", "Маржа нет", "Рен"],
+			["Товары", "Тонна", "Сумма продаж", "Сумма себ", "Маржа", /* "RCP сумма", */ "%", "Маржа нет", "Рен"],
 			this.context.product_margin_title || null
 		);
 		this.render_table(
@@ -251,7 +251,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 
 	getTableColumnWidths(key, columnCount) {
 		const widthMap = {
-			"product-margin": ["22%", "8%", "13%", "11%", "11%", "10%", "6%", "12%", "7%"],
+			"product-margin": ["22%", "8%", "13%", "11%", "11%", /* "10%", */ "6%", "12%", "7%"],
 			"client-kpi": ["34%", "16%", "32%", "18%"],
 			"kpi-client-monthly": ["22%", "10%", "10%", "8%", "10%", "10%", "8%", "12%", "10%"],
 			"regional-summary": ["34%", "22%", "26%", "18%"],

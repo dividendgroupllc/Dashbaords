@@ -751,6 +751,73 @@ def get_debtor_total(period_end: str | None = None) -> float:
     return sum(get_debtor_balance_rows(period_end=period_end).values())
 
 
+def get_debtor_daily_balances(year: str | int, month: str | int | None = None) -> dict[int, float]:
+    """Running end-of-day debtor balance for each day of the given month.
+
+    Returns ``{day_of_month: balance}`` for every day 1..days_in_month, where each value is the
+    cumulative (debit - credit) on the debtor accounts up to and including that day — the same
+    closing-balance basis as ``get_debtor_total`` / the «Долг» card. Used to drive the main
+    dashboard debt-heatmap calendar.
+    """
+    month_no = _month_number(month)
+    if not year or not month_no:
+        return {}
+
+    debtor_accounts = _filter_existing_account_names(_get_debtor_account_names())
+    if not debtor_accounts:
+        return {}
+
+    company = frappe.db.get_value("Account", debtor_accounts[0], "company") or get_default_company()
+    if not company:
+        return {}
+
+    first_day = f"{cint(year)}-{month_no:02d}-01"
+    last_day = str(get_last_day(first_day))
+    days_in_month = calendar.monthrange(cint(year), month_no)[1]
+    params = {"company": company, "accounts": tuple(debtor_accounts)}
+
+    # Opening balance carried into the first day of the month (one indexed aggregate).
+    opening = frappe.db.sql(
+        """
+        SELECT SUM(COALESCE(debit, 0) - COALESCE(credit, 0)) AS balance
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND account IN %(accounts)s
+          AND posting_date < %(first_day)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        """,
+        {**params, "first_day": first_day},
+        as_dict=True,
+    )[0].balance
+
+    # Net movement per day within the month (one grouped aggregate).
+    daily_rows = frappe.db.sql(
+        """
+        SELECT DAY(posting_date) AS day_no,
+               SUM(COALESCE(debit, 0) - COALESCE(credit, 0)) AS net
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND account IN %(accounts)s
+          AND posting_date BETWEEN %(first_day)s AND %(last_day)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        GROUP BY DAY(posting_date)
+        """,
+        {**params, "first_day": first_day, "last_day": last_day},
+        as_dict=True,
+    )
+    daily_flow = {int(row.day_no): flt(row.net) for row in daily_rows if row.day_no}
+
+    balances: dict[int, float] = {}
+    running = flt(opening)
+    for day in range(1, days_in_month + 1):
+        running += daily_flow.get(day, 0.0)
+        as_of = f"{cint(year)}-{month_no:02d}-{day:02d}"
+        balances[day] = convert_company_currency_amount(running, as_of, company)
+    return balances
+
+
 def get_creditor_total(period_end: str | None = None) -> float:
     creditor_accounts = get_creditor_account_names()
     if creditor_accounts:
