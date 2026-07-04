@@ -461,7 +461,7 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     margin_value = sales_value - tannarx_value
     # Use absolute sum as denominator so chart always renders when any value is non-zero.
     # The signed sum can equal zero when a negative value cancels positive values.
-    abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value) + abs(sales_value)
+    abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value) + abs(sales_value) + abs(margin_value)
     harajatlar_percent = round(_safe_div(harajatlar_value * 100, abs_denominator), 1) if abs_denominator else 0
     net_profit_percent = round(_safe_div(net_profit_value * 100, abs_denominator), 1) if abs_denominator else 0
     tannarx_percent = round(_safe_div(tannarx_value * 100, abs_denominator), 1) if abs_denominator else 0

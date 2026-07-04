@@ -338,7 +338,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
     total_rsp = sum(flt(row["rsp"]) for row in values)
     total_margin = sum(flt(row["margin"]) for row in values)
     total_sales = sum(flt(row["sales"]) for row in values)
-    total_rsp_percent = (total_rsp / total_sales * 100) if total_sales else 0
+    total_margin_percent = (total_margin / total_sales * 100) if total_sales else 0
 
     result = [
         [
@@ -348,7 +348,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(row["cost"]),
             format_number(row["margin"]),
             # format_number(row["rsp"]),  # RCP сумма column hidden for now (kept for later use)
-            f"{((flt(row['rsp']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
+            f"{((flt(row['margin']) / flt(row['sales'])) * 100) if flt(row['sales']) else 0:.1f}%".replace(".", ","),
         ]
         for row in selected_values
     ]
@@ -360,7 +360,7 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             format_number(total_cost),
             format_number(total_margin),
             # format_number(total_rsp),  # RCP сумма column hidden for now (kept for later use)
-            f"{total_rsp_percent:.1f}%".replace(".", ","),
+            f"{total_margin_percent:.1f}%".replace(".", ","),
             True,
         ]
     )

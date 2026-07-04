@@ -309,12 +309,14 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
 
-		// Segment order clockwise from 12 o'clock: Net Profit → Тан нарх → Харажатлар → Сумма продаж
+		// Segment order clockwise from 12 o'clock (matches the legend below):
+		// Сумма продаж → Тан нарх → Маржа → Харажатлар → Чистая прибыль
 		const SEGS = [
-			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#16a34a" },
-			{ label: "Тан нарх",       pct: Number(data.tannarx_percent || 0),    amount: data.tannarx_amount_display || "0 UZS",    pctDisp: data.tannarx_percent_display || "0%",    color: "#3b82f6" },
-			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0), amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#dc2626" },
 			{ label: "Сумма продаж",   pct: Number(data.sales_percent || 0),      amount: data.sales_amount_display || "0 UZS",      pctDisp: data.sales_percent_display || "0%",      color: "#f59e0b" },
+			{ label: "Тан нарх",       pct: Number(data.tannarx_percent || 0),    amount: data.tannarx_amount_display || "0 UZS",    pctDisp: data.tannarx_percent_display || "0%",    color: "#3b82f6" },
+			{ label: "Маржа",          pct: Number(data.margin_percent || 0),     amount: data.margin_amount_display || "0 UZS",     pctDisp: data.margin_percent_display || "0%",     color: "#8b5cf6" },
+			{ label: "Харажатлар",     pct: Number(data.harajatlar_percent || 0), amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#dc2626" },
+			{ label: "Чистая прибыль", pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#16a34a" },
 		];
 
 		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
@@ -342,10 +344,11 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 
 		// Per-color top-light gradient for 3D depth (light top → base → dark bottom)
 		const GRAD = {
-			"#16a34a": ["#86efac", "#16a34a", "#14532d"], // green – чистая прибыль
-			"#3b82f6": ["#93c5fd", "#3b82f6", "#1e3a8a"], // blue  – тан нарх
-			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red   – харажатлар
-			"#f59e0b": ["#fcd34d", "#f59e0b", "#92400e"], // amber – сумма продаж
+			"#16a34a": ["#86efac", "#16a34a", "#14532d"], // green  – чистая прибыль
+			"#3b82f6": ["#93c5fd", "#3b82f6", "#1e3a8a"], // blue   – тан нарх
+			"#8b5cf6": ["#c4b5fd", "#8b5cf6", "#4c1d95"], // purple – маржа
+			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red    – харажатлар
+			"#f59e0b": ["#fcd34d", "#f59e0b", "#92400e"], // amber  – сумма продаж
 		};
 		const gid = (c) => `mbg${c.replace("#", "")}`;
 		const defs = `<defs>${SEGS.map((seg) => {
@@ -390,17 +393,7 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 		</svg>`;
 
 		const fmtAmt = (s) => frappe.utils.escape_html(String(s || "").replace(/ UZS$/, " сум"));
-		// Legend order is fixed (Сумма продаж → Тан нарх → Маржа → Харажатлар → Чистая прибыль);
-		// «Маржа» (= Сумма продаж − Тан нарх) is legend-only and has no donut segment.
-		const bySeg = Object.fromEntries(SEGS.map((seg) => [seg.label, seg]));
-		const legendRows = [
-			bySeg["Сумма продаж"],
-			bySeg["Тан нарх"],
-			{ label: "Маржа", amount: data.margin_amount_display || "0 UZS", pctDisp: data.margin_percent_display || "0%", color: "#8b5cf6" },
-			bySeg["Харажатлар"],
-			bySeg["Чистая прибыль"],
-		];
-		const rows = legendRows
+		const rows = built
 			.map(
 				(seg) => `<tr class="mds-mb-row">
 					<td class="mds-mb-dot-cell"><span class="mds-mb-dot" style="background:${seg.color}"></span></td>
