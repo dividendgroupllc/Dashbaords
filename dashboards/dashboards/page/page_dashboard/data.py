@@ -157,9 +157,7 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
             posting_date,
             currency,
             company,
-            SUM(CASE WHEN COALESCE(is_return, 0) = 0 THEN COALESCE(net_total, 0) ELSE 0 END) AS sales_total,
-            SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(net_total, 0)) ELSE 0 END) AS return_total,
-            COUNT(CASE WHEN COALESCE(is_return, 0) = 0 THEN name END) AS invoice_count
+            SUM(CASE WHEN COALESCE(is_return, 0) = 1 THEN ABS(COALESCE(net_total, 0)) ELSE 0 END) AS return_total
         FROM `tabSales Invoice`
         WHERE docstatus = 1
         {invoice_clause}
@@ -173,15 +171,17 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         f"""
         SELECT
             si.posting_date,
+            si.currency,
             si.company,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg_total,
+            SUM(COALESCE(sii.amount, sii.net_amount, 0)) AS sales_total,
             SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost_total
         FROM `tabSales Invoice` si
         INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
         {item_clause}
-        GROUP BY si.posting_date, si.company
+        GROUP BY si.posting_date, si.currency, si.company
         """,
         item_params,
         as_dict=True,
@@ -198,7 +198,6 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
     # «Маржа» KPI = yalpi marja (Сумма продаж − Себестоимость), jadval «Маржа»
     # ustuni bilan mos kelishi uchun RCP bu yerda ayirilmaydi (РСП alohida kartada).
     margin_total = sales_total - cost_total
-    invoice_count = sum(flt(row.invoice_count) for row in invoice_totals)
     return_total = sum(
         convert_to_reporting_currency(
             row.get("return_total"),
@@ -209,17 +208,17 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         for row in invoice_totals
     )
     kg_total = sum(flt(row.kg_total) for row in item_totals)
-    # «Сред.чек» raqamlovchisi: non-return Sales Invoice summalari yig'indisi
-    # (hujjatlar yig'indisi, return AYRILMAGAN). sales_total esa P&L netto qiymati
-    # (return ayrilgan) bo'lib qoladi — faqat avg_check shu manbadan farq qiladi.
-    invoice_sales_total = sum(
+    # «Сред.чек» = 1 kg narxi (jadvaldagi «Цена за кг» bilan bir xil formula):
+    # non-return item summalari / sotilgan kg. Valyuta jadvaldagidek
+    # posting_date kursida konvertatsiya qilinadi.
+    item_sales_total = sum(
         convert_to_reporting_currency(
             row.get("sales_total"),
             row.get("currency"),
-            sales_period_end or row.get("posting_date"),
+            row.get("posting_date"),
             row.get("company"),
         )
-        for row in invoice_totals
+        for row in item_totals
     )
 
     return {
@@ -229,7 +228,7 @@ def get_dashboard_summary(year: str | None = None, month: str | None = None) -> 
         "rsp_total": rcp_total,
         "return_total": return_total,
         "kg_total": kg_total,
-        "avg_check": invoice_sales_total / invoice_count if invoice_count else 0,
+        "avg_check": item_sales_total / kg_total if kg_total else 0,
     }
 
 
