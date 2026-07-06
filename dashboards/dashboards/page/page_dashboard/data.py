@@ -492,40 +492,134 @@ def _get_gross_profit_client_rows(year: str, month: str | None = None) -> list[d
     return result
 
 
-def get_kpi_client_table_rows(year: str | None = None, month: str | None = None) -> list[list[str | bool]]:
-    selected_year = year or get_default_year()
-    clause, params = _period_clause(selected_year, month, alias="je")
-    report_end_date = _period_end_date(selected_year, month)
+def _get_je_customer_fieldname() -> str | None:
+    """Journal Entry'ga UI orqali qo'shilgan Customer link maydonining fieldname'i."""
+    return frappe.db.get_value(
+        "Custom Field",
+        {"dt": "Journal Entry", "fieldtype": "Link", "options": "Customer"},
+        "fieldname",
+    )
 
-    # Бонус = Journal Entry (Дт «Бонус», Кт Debtors + party=Customer). Naqd kassadan
-    # berilgan (party'siz) bonus JE'lari ataylab hisobga olinmaydi — mijozga bog'lab
-    # bo'lmaydi. Grouping label gross-profit jadvalidagi customer_name bilan mos.
-    bonus_rows = frappe.db.sql(
+
+def _get_client_bonus_totals(year: str, month: str | None, report_end_date) -> dict[str, float]:
+    """Bonus JE'larini (Дт «Бонус» hisobi) mijozlarga taqsimlash.
+
+    Har bir JE uch usuldan biri bilan mijozga bog'lanadi (ustuvorlik tartibida):
+    1. Qatorda party=Customer (Кт Debtors) — may'gacha kiritilgan asosiy oqim;
+    2. JE'dagi custom Customer link maydoni — bundan keyingi oqim;
+    3. user_remark matni Customer nomiga mos kelsa — naqd kassaga yozilgan eski JE'lar.
+    Uchalasi ham bo'lmasa, JE hech kimga taqsimlanmaydi.
+    """
+    clause, params = _period_clause(year, month, alias="je")
+
+    jes = frappe.db.sql(
         f"""
         SELECT
-            COALESCE(NULLIF(c.customer_name, ''), jea.party, 'Неизвестный клиент') AS client,
-            je.posting_date,
+            je.name,
             je.company,
-            SUM(COALESCE(jea.credit, 0) - COALESCE(jea.debit, 0)) AS bonus_amount
+            je.user_remark,
+            SUM(
+                CASE WHEN LOWER(TRIM(acc.account_name)) IN ('bonus', 'бонус')
+                    THEN COALESCE(jea.debit, 0) - COALESCE(jea.credit, 0)
+                    ELSE 0
+                END
+            ) AS bonus_amount
         FROM `tabJournal Entry` je
         INNER JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
-        LEFT JOIN `tabCustomer` c ON c.name = jea.party
+        INNER JOIN `tabAccount` acc ON acc.name = jea.account
         WHERE je.docstatus = 1
-          AND jea.party_type = 'Customer'
-          AND COALESCE(jea.party, '') != ''
-          AND EXISTS (
-              SELECT 1
-              FROM `tabJournal Entry Account` bonus_line
-              INNER JOIN `tabAccount` bonus_acc ON bonus_acc.name = bonus_line.account
-              WHERE bonus_line.parent = je.name
-                AND LOWER(TRIM(bonus_acc.account_name)) IN ('bonus', 'бонус')
-          )
-          {clause}
-        GROUP BY COALESCE(NULLIF(c.customer_name, ''), jea.party, 'Неизвестный клиент'), je.posting_date, je.company
+        {clause}
+        GROUP BY je.name, je.company, je.user_remark
+        HAVING bonus_amount <> 0
         """,
         params,
         as_dict=True,
     )
+    if not jes:
+        return {}
+
+    je_names = tuple(je.name for je in jes)
+
+    party_rows = frappe.db.sql(
+        """
+        SELECT
+            jea.parent AS je_name,
+            jea.party,
+            SUM(COALESCE(jea.credit, 0) - COALESCE(jea.debit, 0)) AS amount
+        FROM `tabJournal Entry Account` jea
+        INNER JOIN `tabAccount` acc ON acc.name = jea.account
+        WHERE jea.parent IN %(names)s
+          AND jea.party_type = 'Customer'
+          AND COALESCE(jea.party, '') != ''
+          AND LOWER(TRIM(acc.account_name)) NOT IN ('bonus', 'бонус')
+        GROUP BY jea.parent, jea.party
+        """,
+        {"names": je_names},
+        as_dict=True,
+    )
+    party_by_je: dict[str, list] = {}
+    for row in party_rows:
+        party_by_je.setdefault(row.je_name, []).append(row)
+
+    header_customers: dict[str, str] = {}
+    customer_field = _get_je_customer_fieldname()
+    if customer_field:
+        for row in frappe.db.sql(
+            f"""
+            SELECT name, `{customer_field}` AS customer
+            FROM `tabJournal Entry`
+            WHERE name IN %(names)s AND COALESCE(`{customer_field}`, '') != ''
+            """,
+            {"names": je_names},
+            as_dict=True,
+        ):
+            header_customers[row.name] = row.customer
+
+    customers = frappe.get_all("Customer", fields=["name", "customer_name"])
+    label_by_id = {c.name: (c.customer_name or c.name) for c in customers}
+
+    def match_remark(remark: str | None) -> str | None:
+        text = (remark or "").strip().lower()
+        if not text:
+            return None
+        best: tuple[str, int] | None = None
+        for c in customers:
+            for candidate in (c.customer_name, c.name):
+                cand = (candidate or "").strip().lower()
+                if not cand:
+                    continue
+                if cand == text:
+                    return c.name
+                # Qisman moslik uchun juda qisqa nomlar olinmaydi (yolg'on moslik xavfi).
+                if len(cand) >= 5 and (cand in text or text in cand):
+                    if best is None or len(cand) > best[1]:
+                        best = (c.name, len(cand))
+        return best[0] if best else None
+
+    totals: dict[str, float] = {}
+    for je in jes:
+        party_lines = party_by_je.get(je.name)
+        if party_lines:
+            for line in party_lines:
+                amount = convert_company_currency_amount_like_report(line.amount, report_end_date, je.company)
+                label = label_by_id.get(line.party, line.party)
+                totals[label] = totals.get(label, 0.0) + amount
+            continue
+
+        customer = header_customers.get(je.name) or match_remark(je.user_remark)
+        if not customer:
+            continue
+        amount = convert_company_currency_amount_like_report(je.bonus_amount, report_end_date, je.company)
+        label = label_by_id.get(customer, customer)
+        totals[label] = totals.get(label, 0.0) + amount
+
+    return totals
+
+
+def get_kpi_client_table_rows(year: str | None = None, month: str | None = None) -> list[list[str | bool]]:
+    selected_year = year or get_default_year()
+    report_end_date = _period_end_date(selected_year, month)
+    bonus_totals = _get_client_bonus_totals(selected_year, month, report_end_date)
 
     grouped: dict[str, dict[str, float | str]] = {}
     for row in _get_gross_profit_client_rows(selected_year, month):
@@ -545,12 +639,11 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
         existing["cost"] += flt(row["cost"])
         existing["qty"] += flt(row["qty"])
 
-    for row in bonus_rows:
-        bonus_amount = convert_company_currency_amount_like_report(row.bonus_amount, report_end_date, row.company)
+    for client, bonus_amount in bonus_totals.items():
         existing = grouped.setdefault(
-            row.client,
+            client,
             {
-                "client": row.client,
+                "client": client,
                 "sales": 0.0,
                 "cost": 0.0,
                 "qty": 0.0,
