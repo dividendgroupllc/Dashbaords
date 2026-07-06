@@ -285,7 +285,8 @@ def get_product_margin_rows(year: str | None = None, month: str | None = None, l
             COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар') AS item_code,
             COALESCE(NULLIF(sii.item_name, ''), sii.item_code, 'Неизвестный товар') AS item_label,
             si.company,
-            SUM(CASE WHEN COALESCE(si.is_return, 0) = 0 THEN COALESCE(sii.stock_qty, sii.qty, 0) ELSE 0 END) AS qty_total,
+            -- Return rows carry negative qty, so the plain SUM nets returned kg out of the tonnage.
+            SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS qty_total,
             SUM(COALESCE(sii.base_net_amount, 0)) AS sales_amount,
             SUM(CASE WHEN COALESCE(si.is_return, 0) = 0 THEN COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0) ELSE 0 END) AS cost_amount
         FROM `tabSales Invoice` si
@@ -493,30 +494,34 @@ def _get_gross_profit_client_rows(year: str, month: str | None = None) -> list[d
 
 def get_kpi_client_table_rows(year: str | None = None, month: str | None = None) -> list[list[str | bool]]:
     selected_year = year or get_default_year()
-    clause, params = _period_clause(selected_year, month, alias="si")
+    clause, params = _period_clause(selected_year, month, alias="je")
     report_end_date = _period_end_date(selected_year, month)
 
+    # Бонус = Journal Entry (Дт «Бонус», Кт Debtors + party=Customer). Naqd kassadan
+    # berilgan (party'siz) bonus JE'lari ataylab hisobga olinmaydi — mijozga bog'lab
+    # bo'lmaydi. Grouping label gross-profit jadvalidagi customer_name bilan mos.
     bonus_rows = frappe.db.sql(
         f"""
         SELECT
-            COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент') AS client,
-            si.posting_date,
-            si.company,
-            SUM(
-                CASE
-                    WHEN COALESCE(si.is_return, 0) = 1 THEN -1
-                    ELSE 1
-                END * ABS(COALESCE(sii.base_net_amount, sii.base_amount, sii.net_amount, sii.amount, 0))
-            ) AS bonus_amount
-        FROM `tabSales Invoice` si
-        INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-        WHERE si.docstatus = 1
-          AND (
-              LOWER(TRIM(COALESCE(sii.item_name, ''))) IN ('bonus', 'бонус')
-              OR LOWER(TRIM(COALESCE(sii.item_code, ''))) IN ('bonus', 'бонус')
+            COALESCE(NULLIF(c.customer_name, ''), jea.party, 'Неизвестный клиент') AS client,
+            je.posting_date,
+            je.company,
+            SUM(COALESCE(jea.credit, 0) - COALESCE(jea.debit, 0)) AS bonus_amount
+        FROM `tabJournal Entry` je
+        INNER JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
+        LEFT JOIN `tabCustomer` c ON c.name = jea.party
+        WHERE je.docstatus = 1
+          AND jea.party_type = 'Customer'
+          AND COALESCE(jea.party, '') != ''
+          AND EXISTS (
+              SELECT 1
+              FROM `tabJournal Entry Account` bonus_line
+              INNER JOIN `tabAccount` bonus_acc ON bonus_acc.name = bonus_line.account
+              WHERE bonus_line.parent = je.name
+                AND LOWER(TRIM(bonus_acc.account_name)) IN ('bonus', 'бонус')
           )
           {clause}
-        GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент'), si.posting_date, si.company
+        GROUP BY COALESCE(NULLIF(c.customer_name, ''), jea.party, 'Неизвестный клиент'), je.posting_date, je.company
         """,
         params,
         as_dict=True,

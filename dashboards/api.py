@@ -25,7 +25,7 @@ DEFAULT_ROUTE_LABELS = {
     "daily-dashboard": "Ежедневный дашборд",
     "sales-dashboard": "Дашборд продаж",
     "manufacture-dashboard": "Производственный дашборд",
-    "comparison-by-product": "Сравнение по товару",
+    "comparison-by-product": "Сравнение по продуктам",
     "dividend-analysis": "Анализ дивидендов",
     "supplier-dashboard": "Дашборд по поставщикам",
     "monthly-analysis": "Ежемесячный анализ",
@@ -59,9 +59,10 @@ def get_dashboard_sidebar_items() -> list[dict[str, str]]:
         if page.name not in HIDDEN_ROUTES and page.name not in route_names
     )
 
+    # Russian labels take precedence over Page titles from the DB, which are English.
     return [
         {
-            "label": page_map.get(route, DEFAULT_ROUTE_LABELS.get(route, route)),
+            "label": DEFAULT_ROUTE_LABELS.get(route) or page_map.get(route, route),
             "route": route,
         }
         for route in route_names

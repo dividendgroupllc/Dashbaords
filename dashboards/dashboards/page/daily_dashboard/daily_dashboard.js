@@ -239,10 +239,6 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 			{ label: "Сумма продаж", className: "is-number" },
 			{ label: "Себестоимость", className: "is-number" },
 			{ label: "Маржа", className: "is-number" },
-			{ label: "Бонус", className: "is-number" },
-			{ label: "Рен", className: "is-number" },
-			{ label: "ЧП", className: "is-number" },
-			{ label: "Рен ЧП", className: "is-number" },
 		];
 			const colgroup = `
 				<colgroup>
@@ -251,10 +247,6 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 					<col style="width:150px">
 					<col style="width:150px">
 					<col style="width:150px">
-					<col style="width:130px">
-					<col style="width:82px">
-					<col style="width:150px">
-					<col style="width:90px">
 				</colgroup>
 			`;
 
@@ -277,10 +269,6 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 									<td class="is-number">${this.formatInteger(row.sales)}</td>
 									<td class="is-number">${this.formatInteger(row.cost)}</td>
 									<td class="is-number">${this.formatInteger(row.margin)}</td>
-									<td class="is-number">${this.formatInteger(row.bonus)}</td>
-									<td class="is-number">${this.formatPercent(row.profitability)}</td>
-									<td class="is-number">${this.formatInteger(row.np)}</td>
-									<td class="is-number">${this.formatSignedPercent(row.np_profitability)}</td>
 								</tr>
 							`
 						)
@@ -293,10 +281,6 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 							<td class="is-number">${this.formatInteger(total.sales)}</td>
 							<td class="is-number">${this.formatInteger(total.cost)}</td>
 							<td class="is-number">${this.formatInteger(total.margin)}</td>
-							<td class="is-number">${this.formatInteger(total.bonus)}</td>
-							<td class="is-number">${this.formatPercent(total.profitability)}</td>
-							<td class="is-number">${this.formatInteger(total.np)}</td>
-							<td class="is-number">${this.formatSignedPercent(total.np_profitability)}</td>
 						</tr>
 					</tfoot>
 				</table>
@@ -345,15 +329,11 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 				accumulator.sales += row.sales;
 				accumulator.cost += row.cost;
 				accumulator.margin += row.margin;
-				accumulator.bonus += row.bonus;
-				accumulator.np += row.np;
 				return accumulator;
 			},
-			{ kg: 0, sales: 0, cost: 0, margin: 0, bonus: 0, np: 0 }
+			{ kg: 0, sales: 0, cost: 0, margin: 0 }
 		);
 
-		total.profitability = total.sales ? (total.margin / total.sales) * 100 : 0;
-		total.np_profitability = total.sales ? (total.np / total.sales) * 100 : 0;
 		return total;
 	}
 
@@ -375,15 +355,4 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		return `${sign}${String(numeric).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
 	}
 
-	formatPercent(value) {
-		return `${this.formatDecimal(value)}%`;
-	}
-
-	formatSignedPercent(value) {
-		return `${value < 0 ? "-" : ""}${this.formatDecimal(Math.abs(value))}%`;
-	}
-
-	formatDecimal(value) {
-		return Number(value || 0).toFixed(1).replace(".", ",");
-	}
 };
