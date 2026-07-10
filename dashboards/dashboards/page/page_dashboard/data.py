@@ -676,7 +676,8 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
                 format_number(row["qty"]),
                 format_number(margin),
                 format_number(row["bonus"]),
-                f"{(flt(row['bonus']) / margin * 100) if margin else 0:.1f}%".replace(".", ","),
+                format_number(margin - flt(row["bonus"])),
+                f"{(margin / sales * 100) if sales else 0:.1f}%".replace(".", ","),
             ]
         )
 
@@ -688,7 +689,8 @@ def get_kpi_client_table_rows(year: str | None = None, month: str | None = None)
             format_number(total_qty),
             format_number(total_margin),
             format_number(total_bonus),
-            f"{(total_bonus / total_margin * 100) if total_margin else 0:.1f}%".replace(".", ","),
+            format_number(total_margin - total_bonus),
+            f"{(total_margin / total_sales * 100) if total_sales else 0:.1f}%".replace(".", ","),
             True,
         ]
     )

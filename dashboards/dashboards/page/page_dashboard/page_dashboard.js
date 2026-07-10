@@ -189,7 +189,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		this.render_table(
 			"kpi-client-monthly",
 			this.context.kpi_client_rows || [],
-			["Клиент", "Продажа", "Сб.ст", "КГ", "Маржа", "Бонус", "%"],
+			["Клиент", "Продажа", "Сб.ст", "КГ", "Маржа", "Бонус", "ЧП", "%"],
 			this.context.kpi_client_title || null
 		);
 		this.render_table(
@@ -253,7 +253,7 @@ dashboards.ui.PageDashboardPage = class PageDashboardPage {
 		const widthMap = {
 			"product-margin": ["30%", "10%", "18%", "16%", "16%", /* "10%", */ "10%"],
 			"client-kpi": ["34%", "16%", "32%", "18%"],
-			"kpi-client-monthly": ["28%", "13%", "13%", "10%", "13%", "13%", "10%"],
+			"kpi-client-monthly": ["25%", "12%", "12%", "9%", "12%", "12%", "11%", "7%"],
 			"regional-summary": ["34%", "22%", "26%", "18%"],
 		};
 

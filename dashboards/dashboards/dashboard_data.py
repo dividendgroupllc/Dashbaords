@@ -652,12 +652,31 @@ def get_monthly_net_profit_from_profit_and_loss(year: str) -> dict[int, float]:
 
     columns, data = _get_profit_and_loss_report(company, year)
 
-    target_row = next(
-        (row for row in data if str(row.get("account") or "").strip("'") == "Profit for the year"),
-        None,
-    )
+    # The report's own "Profit for the year" row is rendered through the session
+    # language (e.g. «Прибыль за год» for ru users), so matching it by label breaks
+    # for non-English sessions. Compute the same figure from the root account rows
+    # instead: their names come straight from tabAccount and are never translated.
+    sign_by_root = {
+        row.name: 1 if row.root_type == "Income" else -1
+        for row in frappe.get_all(
+            "Account",
+            filters={
+                "company": company,
+                "parent_account": ("is", "not set"),
+                "root_type": ("in", ("Income", "Expense")),
+            },
+            fields=["name", "root_type"],
+        )
+    }
 
-    month_map = _map_pl_row_to_months(columns, target_row)
+    month_map = {month_no: 0.0 for month_no in range(1, 13)}
+    for row in data:
+        sign = sign_by_root.get(str(row.get("account") or ""))
+        if not sign:
+            continue
+        for month_no, value in _map_pl_row_to_months(columns, row).items():
+            month_map[month_no] += sign * value
+
     _MONTHLY_NET_PROFIT_PL_CACHE[year_key] = month_map
     return month_map
 
