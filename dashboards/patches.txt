@@ -13,3 +13,4 @@ dashboards.patches.v1_0.remove_retired_dashboard_pages
 dashboards.patches.v1_0.ensure_manufacture_dashboard_page
 dashboards.patches.v1_0.add_dashboard_indexes
 dashboards.patches.v1_0.unbind_dashboards_workspace_module
+dashboards.patches.v1_0.ensure_investors_page

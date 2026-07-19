@@ -144,6 +144,7 @@ WARM_TARGETS = [
     "dashboards.dashboards.page.customer_comparison.customer_comparison.get_dashboard_context",
     "dashboards.dashboards.page.product_by_customer.product_by_customer.get_dashboard_context",
     "dashboards.dashboards.page.dividend_analysis.dividend_analysis.get_dashboard_context",
+    "dashboards.dashboards.page.investors.investors.get_dashboard_data",
 ]
 
 

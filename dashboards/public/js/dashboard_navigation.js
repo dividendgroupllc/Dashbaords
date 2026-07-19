@@ -6,6 +6,7 @@ frappe.provide("dashboards.ui");
 	const SCOPE_CLASS = "custom-dashboard-scope";
 	const FALLBACK_MENU_ITEMS = [
 		{ label: __("ГЛАВНЫЙ"), route: "main-dashboard" },
+		{ label: __("Инвесторы"), route: "investors" },
 		{ label: __("Дашборд"), route: "page-dashboard" },
 		{ label: __("Ежедневно"), route: "daily-dashboard" },
 		{ label: __("Продажа"), route: "sales-dashboard" },

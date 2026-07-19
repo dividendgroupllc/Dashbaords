@@ -29,7 +29,7 @@ app_include_css = [
 	"/assets/dashboards/css/dashboard_navigation.css",
 	"/assets/dashboards/css/custom.css",
 ]
-app_include_js = "/assets/dashboards/js/dashboard_navigation.js?v=20260428-sidebar-dynamic"
+app_include_js = "/assets/dashboards/js/dashboard_navigation.js?v=20260719-investors"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/dashboards/css/dashboards.css"

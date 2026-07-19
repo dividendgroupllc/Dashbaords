@@ -6,6 +6,7 @@ import frappe
 ACCESS_ROLE = "investor"
 DASHBOARD_PAGES = (
     "main-dashboard",
+    "investors",
     "page-dashboard",
     "monthly-analysis",
     "overview-dashboard",

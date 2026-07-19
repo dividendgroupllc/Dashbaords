@@ -12,6 +12,7 @@ CARD_LABEL = "Дашборды"
 
 SHORTCUT_LABELS_BY_URL = {
     "/app/main-dashboard": "Главный дашборд",
+    "/app/investors": "Инвесторы",
     "/app/page-dashboard": "Дашборд",
     "/app/monthly-analysis": "Ежемесячный анализ",
     "/app/overview-dashboard": "Обзорный дашборд",
@@ -33,6 +34,7 @@ LINK_LABELS_BY_ROUTE = {
 }
 WORKSPACE_LINK_ORDER = [
     "main-dashboard",
+    "investors",
     "page-dashboard",
     "sales-dashboard",
     "daily-dashboard",

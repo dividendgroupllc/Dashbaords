@@ -5,6 +5,7 @@ import frappe
 
 DEFAULT_ROUTE_ORDER = [
     "main-dashboard",
+    "investors",
     "page-dashboard",
     "daily-dashboard",
     "sales-dashboard",
@@ -21,6 +22,7 @@ DEFAULT_ROUTE_ORDER = [
 ]
 DEFAULT_ROUTE_LABELS = {
     "main-dashboard": "Главный дашборд",
+    "investors": "Инвесторы",
     "page-dashboard": "Дашборд",
     "daily-dashboard": "Ежедневный дашборд",
     "sales-dashboard": "Дашборд продаж",
