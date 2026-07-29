@@ -187,6 +187,7 @@
 
 .daily-dashboard-calendar-panel,
 .daily-dashboard-table-panel {
+	min-width: 0;
 	border: 1px solid #585858;
 	border-radius: 10px;
 	background: #fbfbfc;
@@ -403,6 +404,51 @@
 	}
 
 	.daily-dashboard-content {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+@media (max-width: 820px) {
+	.daily-dashboard-topbar {
+		grid-template-columns: 1fr auto;
+		gap: 12px;
+	}
+
+	.daily-dashboard-info {
+		display: none;
+	}
+
+	.daily-dashboard-months {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		padding: 10px 12px 8px;
+	}
+
+	.daily-dashboard-clients {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		margin: 10px 8px 8px;
+	}
+
+	.daily-dashboard-calendar-cell {
+		min-height: 44px;
+	}
+}
+
+@media (max-width: 560px) {
+	.daily-dashboard-months {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.daily-dashboard-clients {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.daily-dashboard-calendar-cell {
+		min-height: 40px;
+		padding: 3px 3px;
+	}
+
+	.daily-dashboard-calendar-day,
+	.daily-dashboard-calendar-value {
+		font-size: 10px;
 	}
 }

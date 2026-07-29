@@ -1,0 +1,14 @@
+<!--
+  Marker file (intentionally empty after Frappe strips HTML comments).
+
+  The mere presence of any .html file in a page folder makes Frappe flag this
+  page as a "dynamic page" in frappe/core/doctype/page/page.py -> load_assets()
+  (self._dynamic_page = True). desk_page.get() then returns _dynamic_page = 1,
+  and frappe/public/js/frappe/views/pageview.js SKIPS caching the page in
+  localStorage["_page:<name>"].
+
+  Effect: this page's .js / .css are always fetched fresh from the server on
+  every reload, so edits show up immediately -- scoped to dashboard pages only,
+  WITHOUT enabling site-wide developer_mode. Keep this file.
+  (Do not place a jinja render token inside it.)
+-->
