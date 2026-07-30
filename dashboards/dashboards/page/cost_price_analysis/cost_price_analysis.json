@@ -1,0 +1,26 @@
+{
+ "content": null,
+ "creation": "2026-07-30 00:00:00",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-30 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Dashboards",
+ "name": "cost-price-analysis",
+ "owner": "Administrator",
+ "page_name": "cost-price-analysis",
+ "roles": [
+  {
+   "role": "investor"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Себестоимость продукции"
+}

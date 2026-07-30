@@ -15,6 +15,7 @@ DASHBOARD_PAGES = (
     "supplier-dashboard",
     "sales-dashboard",
     "manufacture-dashboard",
+    "cost-price-analysis",
     "comparison-by-weight",
     "comparison-by-amount",
     "comparison-by-product",

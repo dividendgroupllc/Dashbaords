@@ -1,0 +1,339 @@
+.layout-main-section-wrapper.cost-price-analysis-layout {
+	padding: 0;
+	background: #f4f7fc;
+	overflow-x: hidden;
+}
+
+.cost-price-analysis-page-head {
+	display: none;
+}
+
+.cpa-screen {
+	--cpa-blue: #0b5dc4;
+	--cpa-ink: #071227;
+	--cpa-muted: #627089;
+	--cpa-line: #e5ebf4;
+	--cpa-up: #c4161c;
+	--cpa-up-soft: #fdeceb;
+	--cpa-down: #0f8a5f;
+	--cpa-down-soft: #e7f6ef;
+	min-height: 100vh;
+	padding: 22px 16px 26px;
+	color: var(--cpa-ink);
+	font-family: "Aptos", "Trebuchet MS", sans-serif;
+	background:
+		radial-gradient(circle at 75% -12%, rgba(11, 93, 196, 0.12), transparent 26%),
+		linear-gradient(180deg, #fbfdff 0%, #f3f6fb 100%);
+}
+
+.cpa-main {
+	max-width: 1720px;
+	margin: 0 auto;
+}
+
+/* ── фильтры ─────────────────────────────────────────────────────────────── */
+
+/* Выравнивание по началу блока, а не по низу: если панель не помещается в одну
+   строку, поля переносятся целиком, и подписи всех полей строки остаются на одной
+   высоте. При выравнивании по низу поле с перенёсшимися кнопками становилось выше
+   соседних и «роняло» их подписи. */
+.cpa-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 14px 18px;
+	margin-bottom: 16px;
+	padding: 16px 18px;
+	border: 1px solid #e6edf6;
+	border-radius: 14px;
+	background: rgba(255, 255, 255, 0.94);
+	box-shadow: 0 10px 28px rgba(31, 48, 82, 0.06);
+}
+
+.cpa-field {
+	display: flex;
+	min-width: 150px;
+	flex: 0 0 auto;
+	flex-direction: column;
+	gap: 7px;
+}
+
+/* Поиск забирает свободное место, чтобы строка не выглядела рваной. */
+.cpa-field--search {
+	flex: 1 1 180px;
+}
+
+/* «Сортировка» и кнопка выгрузки переносятся только вместе: иначе на узком
+   экране кнопка уезжала на отдельную строку и висела там одна. */
+.cpa-filter-tail {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: flex-start;
+	gap: 18px;
+	margin-left: auto;
+}
+
+.cpa-field-label {
+	color: #526783;
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 16px;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.cpa-input {
+	height: 38px;
+	padding: 0 12px;
+	border: 1px solid #dbe4f1;
+	border-radius: 8px;
+	background: #f8fbff;
+	color: #0c1830;
+	font-family: inherit;
+	font-size: 14px;
+}
+
+.cpa-input:focus {
+	border-color: #9ac8ff;
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(11, 93, 196, 0.12);
+}
+
+.cpa-chips {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 8px;
+}
+
+.cpa-chip {
+	height: 38px;
+	padding: 0 14px;
+	border: 1px solid #e2e9f3;
+	border-radius: 8px;
+	background: #f8fbff;
+	color: #2e425d;
+	font-family: inherit;
+	font-size: 13px;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.cpa-chip:hover {
+	border-color: #c3d7f2;
+}
+
+.cpa-chip.is-active {
+	border-color: #9ac8ff;
+	background: #e8f3ff;
+	color: #005bc7;
+	font-weight: 700;
+	box-shadow: inset 0 -2px 0 #8fc3ff;
+}
+
+.cpa-export {
+	height: 38px;
+	padding: 0 18px;
+	border: 0;
+	border-radius: 8px;
+	background: var(--cpa-blue);
+	color: #fff;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.cpa-export:hover {
+	background: #0a4c9f;
+}
+
+/* ── таблица ─────────────────────────────────────────────────────────────── */
+
+.cpa-panel {
+	border: 1px solid #e6edf6;
+	border-radius: 14px;
+	background: #fff;
+	box-shadow: 0 10px 28px rgba(31, 48, 82, 0.06);
+	overflow: hidden;
+}
+
+.cpa-table-wrap {
+	max-height: calc(100vh - 165px);
+	min-height: 320px;
+	/* Только вертикальная прокрутка: ширина колонок задаётся в процентах,
+	   поэтому все 12 месяцев обязаны помещаться в экран. */
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.cpa-table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 12.5px;
+}
+
+.cpa-table th,
+.cpa-table td {
+	padding: 6px 7px;
+	overflow: hidden;
+	border-bottom: 1px solid #eef2f8;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cpa-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	border-bottom: 1px solid #dde5f0;
+	background: #f2f6fc;
+	color: #33496a;
+	font-size: 11.5px;
+	font-weight: 800;
+	letter-spacing: 0.05em;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.cpa-table thead th.is-idle {
+	color: #a6b2c6;
+}
+
+.cpa-name-col,
+.cpa-name-cell {
+	background: #fff;
+	box-shadow: 1px 0 0 #e8edf6;
+}
+
+.cpa-table thead th.cpa-name-col {
+	background: #f2f6fc;
+	text-align: left;
+}
+
+.cpa-item-name {
+	overflow: hidden;
+	color: #142441;
+	font-weight: 700;
+	text-overflow: ellipsis;
+}
+
+.cpa-item-meta {
+	margin-top: 2px;
+	overflow: hidden;
+	color: var(--cpa-muted);
+	font-size: 11px;
+	text-overflow: ellipsis;
+}
+
+.cpa-cell {
+	color: #1f3050;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+.cpa-cell-value {
+	font-weight: 700;
+}
+
+.cpa-cell-change {
+	margin-top: 1px;
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.cpa-cell.is-up {
+	background: var(--cpa-up-soft);
+	color: var(--cpa-up);
+}
+
+.cpa-cell.is-down {
+	background: var(--cpa-down-soft);
+	color: var(--cpa-down);
+}
+
+/* Класс .is-carried (месяц без движения, цена перенесена) намеренно не имеет
+   оформления: месяцы без изменения читаются одинаково, выделяются только рост
+   и снижение. Класс оставлен как признак данных на случай будущей подсветки. */
+
+.cpa-cell.is-empty {
+	background: repeating-linear-gradient(135deg, #fbfcfe 0 6px, #f5f7fb 6px 12px);
+}
+
+.cpa-table tbody tr:hover td {
+	background: #f3f8ff;
+}
+
+.cpa-table tbody tr:hover .cpa-cell.is-up {
+	background: #fbdedc;
+}
+
+.cpa-table tbody tr:hover .cpa-cell.is-down {
+	background: #d9f0e5;
+}
+
+.cpa-empty {
+	padding: 60px 20px;
+	color: var(--cpa-muted);
+	font-size: 14px;
+	text-align: center;
+}
+
+/* ── адаптив ─────────────────────────────────────────────────────────────── */
+
+/* Колонок 13, а ширина фиксирована в процентах — на узких экранах уменьшается
+   не количество колонок, а плотность текста. */
+@media (max-width: 1400px) {
+	.cpa-table {
+		font-size: 11.5px;
+	}
+
+	.cpa-table th,
+	.cpa-table td {
+		padding: 5px 5px;
+	}
+}
+
+@media (max-width: 1100px) {
+	.cpa-table {
+		font-size: 10.5px;
+	}
+
+	.cpa-table th,
+	.cpa-table td {
+		padding: 5px 3px;
+	}
+
+	.cpa-cell-change {
+		font-size: 8.8px;
+		letter-spacing: 0;
+	}
+}
+
+@media (max-width: 768px) {
+	.cpa-screen {
+		padding: 14px 8px 20px;
+	}
+
+	.cpa-field {
+		min-width: 100%;
+	}
+
+	.cpa-filter-tail {
+		flex-wrap: wrap;
+		width: 100%;
+		margin-left: 0;
+	}
+
+	.cpa-chips {
+		flex-wrap: wrap;
+	}
+
+	.cpa-table-wrap {
+		max-height: calc(100vh - 330px);
+	}
+}

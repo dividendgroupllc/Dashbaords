@@ -135,6 +135,7 @@ WARM_TARGETS = [
     "dashboards.dashboards.page.daily_dashboard.daily_dashboard.get_dashboard_context",
     "dashboards.dashboards.page.sales_dashboard.sales_dashboard.get_dashboard_context",
     "dashboards.dashboards.page.manufacture_dashboard.manufacture_dashboard.get_dashboard_data",
+    "dashboards.dashboards.page.cost_price_analysis.cost_price_analysis.get_dashboard_context",
     "dashboards.dashboards.page.supplier_dashboard.supplier_dashboard.get_dashboard_context",
     "dashboards.dashboards.page.monthly_analysis.monthly_analysis.get_dashboard_context",
     "dashboards.dashboards.page.comparison_by_amount.comparison_by_amount.get_dashboard_context",
