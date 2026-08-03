@@ -19,6 +19,7 @@ from dashboards.dashboards.dashboard_data import (
     get_debtor_balance_rows,
     get_debtor_daily_balances,
     get_debtor_total,
+    get_expense_type_totals_for_period,
     get_fixed_cost_total_for_period,
     get_monthly_net_profit_from_profit_and_loss,
     get_other_income_total,
@@ -454,7 +455,13 @@ def _get_manufacturing_cost_total(year: str, month: str | None = None) -> float:
 
 def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     from_date, to_date = _get_period_window(year, month)
-    harajatlar_value = abs(flt(get_fixed_cost_total_for_period(from_date, to_date)))
+    # Харажатлар is shown as two slices — Переменные / Постоянные расходы — and both come
+    # strictly from the Expense Category mapping. Expense accounts no category covers are
+    # therefore in neither slice; `unmapped_expense_value` reports how much is still uncategorised.
+    expense_totals = get_expense_type_totals_for_period(from_date, to_date)
+    variable_expense_value = flt(expense_totals.get("variable"))
+    fixed_expense_value = flt(expense_totals.get("fixed"))
+    harajatlar_value = flt(expense_totals.get("total"))
     net_profit_value = flt(get_monthly_net_profit_from_profit_and_loss(year).get(_month_no(month) or 0))
     tannarx_value = abs(flt(get_cogs_total_for_period(from_date, to_date)))
     sales_value = flt(get_monthly_sales_from_profit_and_loss(year).get(_month_no(month) or 0))
@@ -463,27 +470,38 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
     # The signed sum can equal zero when a negative value cancels positive values.
     abs_denominator = abs(harajatlar_value) + abs(net_profit_value) + abs(tannarx_value) + abs(sales_value) + abs(margin_value)
     harajatlar_percent = round(_safe_div(harajatlar_value * 100, abs_denominator), 1) if abs_denominator else 0
+    variable_expense_percent = round(_safe_div(variable_expense_value * 100, abs_denominator), 1) if abs_denominator else 0
+    fixed_expense_percent = round(_safe_div(fixed_expense_value * 100, abs_denominator), 1) if abs_denominator else 0
     net_profit_percent = round(_safe_div(net_profit_value * 100, abs_denominator), 1) if abs_denominator else 0
     tannarx_percent = round(_safe_div(tannarx_value * 100, abs_denominator), 1) if abs_denominator else 0
     sales_percent = round(_safe_div(sales_value * 100, abs_denominator), 1) if abs_denominator else 0
     margin_percent = round(_safe_div(margin_value * 100, abs_denominator), 1) if abs_denominator else 0
     return {
         "harajatlar_value": harajatlar_value,
+        "variable_expense_value": variable_expense_value,
+        "fixed_expense_value": fixed_expense_value,
+        "unmapped_expense_value": flt(expense_totals.get("unmapped")),
         "net_profit_value": net_profit_value,
         "tannarx_value": tannarx_value,
         "sales_value": sales_value,
         "margin_value": margin_value,
         "harajatlar_percent": harajatlar_percent,
+        "variable_expense_percent": variable_expense_percent,
+        "fixed_expense_percent": fixed_expense_percent,
         "net_profit_percent": net_profit_percent,
         "tannarx_percent": tannarx_percent,
         "sales_percent": sales_percent,
         "margin_percent": margin_percent,
         "harajatlar_amount_display": f"{_compact_money_label(harajatlar_value)} UZS",
+        "variable_expense_amount_display": f"{_compact_money_label(variable_expense_value)} UZS",
+        "fixed_expense_amount_display": f"{_compact_money_label(fixed_expense_value)} UZS",
         "net_profit_amount_display": f"{_compact_money_label(net_profit_value)} UZS",
         "tannarx_amount_display": f"{_compact_money_label(tannarx_value)} UZS",
         "sales_amount_display": f"{_compact_money_label(sales_value)} UZS",
         "margin_amount_display": f"{_compact_money_label(margin_value)} UZS",
         "harajatlar_percent_display": f"{harajatlar_percent:.1f}%",
+        "variable_expense_percent_display": f"{variable_expense_percent:.1f}%",
+        "fixed_expense_percent_display": f"{fixed_expense_percent:.1f}%",
         "net_profit_percent_display": f"{net_profit_percent:.1f}%",
         "tannarx_percent_display": f"{tannarx_percent:.1f}%",
         "sales_percent_display": f"{sales_percent:.1f}%",
@@ -491,6 +509,8 @@ def _get_margin_bonus_data(year: str, month: str) -> dict[str, Any]:
         "center_value": f"{int(round(net_profit_percent))}%",
         "center_label": "Чистая прибыль",
         "harajatlar_display": f"Харажатлар ({harajatlar_percent:g}%)",
+        "variable_expense_display": f"Переменные расходы ({variable_expense_percent:g}%)",
+        "fixed_expense_display": f"Постоянные расходы ({fixed_expense_percent:g}%)",
         "net_profit_display": f"Чистая прибыль ({net_profit_percent:g}%)",
         "tannarx_display": f"Тан нарх ({tannarx_percent:g}%)",
     }

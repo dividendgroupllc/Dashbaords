@@ -309,14 +309,17 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 	render_margin_bonus() {
 		const data = this.data?.margin_bonus || {};
 
-		// Segment order clockwise from 12 o'clock (matches the legend below):
-		// Сумма продаж → Тан нарх → Валовая прибыль → Харажатлар → Чистая прибыль
+		// Segment order clockwise from 12 o'clock (matches the legend below). Харажатлар is
+		// split by Expense Category type — an expense account with no category shows in neither
+		// slice, so both stay 0 until the mapping is filled in:
+		// Сумма продаж → Тан нарх → Валовая прибыль → Переменные → Постоянные → Чистая прибыль
 		const SEGS = [
-			{ label: "Сумма продаж",    pct: Number(data.sales_percent || 0),      amount: data.sales_amount_display || "0 UZS",      pctDisp: data.sales_percent_display || "0%",      color: "#f59e0b" },
-			{ label: "Тан нарх",        pct: Number(data.tannarx_percent || 0),    amount: data.tannarx_amount_display || "0 UZS",    pctDisp: data.tannarx_percent_display || "0%",    color: "#3b82f6" },
-			{ label: "Валовая прибыль", pct: Number(data.margin_percent || 0),     amount: data.margin_amount_display || "0 UZS",     pctDisp: data.margin_percent_display || "0%",     color: "#8b5cf6" },
-			{ label: "Харажатлар",      pct: Number(data.harajatlar_percent || 0), amount: data.harajatlar_amount_display || "0 UZS", pctDisp: data.harajatlar_percent_display || "0%", color: "#dc2626" },
-			{ label: "Чистая прибыль",  pct: Number(data.net_profit_percent || 0), amount: data.net_profit_amount_display || "0 UZS", pctDisp: data.net_profit_percent_display || "0%", color: "#16a34a" },
+			{ label: "Сумма продаж",       pct: Number(data.sales_percent || 0),             amount: data.sales_amount_display || "0 UZS",             pctDisp: data.sales_percent_display || "0%",             color: "#f59e0b" },
+			{ label: "Тан нарх",           pct: Number(data.tannarx_percent || 0),           amount: data.tannarx_amount_display || "0 UZS",           pctDisp: data.tannarx_percent_display || "0%",           color: "#3b82f6" },
+			{ label: "Валовая прибыль",    pct: Number(data.margin_percent || 0),            amount: data.margin_amount_display || "0 UZS",            pctDisp: data.margin_percent_display || "0%",            color: "#8b5cf6" },
+			{ label: "Переменные расходы", pct: Number(data.variable_expense_percent || 0),  amount: data.variable_expense_amount_display || "0 UZS",  pctDisp: data.variable_expense_percent_display || "0%",  color: "#dc2626" },
+			{ label: "Постоянные расходы", pct: Number(data.fixed_expense_percent || 0),     amount: data.fixed_expense_amount_display || "0 UZS",     pctDisp: data.fixed_expense_percent_display || "0%",     color: "#0891b2" },
+			{ label: "Чистая прибыль",     pct: Number(data.net_profit_percent || 0),        amount: data.net_profit_amount_display || "0 UZS",        pctDisp: data.net_profit_percent_display || "0%",        color: "#16a34a" },
 		];
 
 		const W = 340, H = 252, CX = 170, CY = 126, OR = 78, IR = 50, ER = 96;
@@ -347,7 +350,8 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			"#16a34a": ["#86efac", "#16a34a", "#14532d"], // green  – чистая прибыль
 			"#3b82f6": ["#93c5fd", "#3b82f6", "#1e3a8a"], // blue   – тан нарх
 			"#8b5cf6": ["#c4b5fd", "#8b5cf6", "#4c1d95"], // purple – валовая прибыль
-			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red    – харажатлар
+			"#dc2626": ["#fca5a5", "#dc2626", "#7f1d1d"], // red    – переменные расходы
+			"#0891b2": ["#67e8f9", "#0891b2", "#164e63"], // cyan   – постоянные расходы
 			"#f59e0b": ["#fcd34d", "#f59e0b", "#92400e"], // amber  – сумма продаж
 		};
 		const gid = (c) => `mbg${c.replace("#", "")}`;
@@ -360,23 +364,44 @@ dashboards.ui.MainDashboardPage = class MainDashboardPage {
 			</linearGradient>`;
 		}).join("")}</defs>`;
 
-		const segments = built
+		const placed = built
+			.filter((seg) => seg.span >= 0.3)
 			.map((seg) => {
-				if (seg.span < 0.3) return "";
-				const d = arcPath(seg.start, seg.end);
-				const mid = pt(OR, seg.mid);
 				const elbow = pt(ER, seg.mid);
-				const isRight = elbow.x >= CX;
+				return { seg, knee: pt(OR, seg.mid), elbow, isRight: elbow.x >= CX, y: elbow.y };
+			});
+
+		// Two neighbouring slices (e.g. a small переменные/постоянные pair) put their leader
+		// labels within a few px of each other, so the 17px numbers would overlap. Spread each
+		// side's labels vertically, then nudge the column back inside the viewBox.
+		const LABEL_GAP = 19;
+		[true, false].forEach((side) => {
+			const column = placed.filter((item) => item.isRight === side).sort((a, b) => a.y - b.y);
+			column.forEach((item, index) => {
+				if (index && item.y - column[index - 1].y < LABEL_GAP) {
+					item.y = column[index - 1].y + LABEL_GAP;
+				}
+			});
+			if (!column.length) return;
+			const overflow = column[column.length - 1].y - (H - 12);
+			if (overflow > 0) column.forEach((item) => { item.y -= overflow; });
+			const underflow = 12 - column[0].y;
+			if (underflow > 0) column.forEach((item) => { item.y += underflow; });
+		});
+
+		const segments = placed
+			.map(({ seg, knee, elbow, isRight, y }) => {
+				const d = arcPath(seg.start, seg.end);
 				const textX = isRight ? RIGHT_X : LEFT_X;
 				const anchor = isRight ? "start" : "end";
-				const ey = elbow.y.toFixed(2);
+				const ey = y.toFixed(2);
 				const amtText = String(seg.amount).replace(/ UZS$/, "");
 				const labelX = isRight ? textX + 5 : textX - 5;
 				// hovering anywhere on the segment enlarges its number label
 				return `<g class="mds-mb-segment">
 					<path class="mds-mb-seg-vis" d="${d}" fill="url(#${gid(seg.color)})"/>
-					<polyline points="${mid.x.toFixed(1)},${mid.y.toFixed(1)} ${elbow.x.toFixed(1)},${ey} ${textX},${ey}" fill="none" stroke="${seg.color}" stroke-width="1.3"/>
-					<text class="mds-mb-amount-text" x="${labelX}" y="${(elbow.y + 5).toFixed(1)}" text-anchor="${anchor}" fill="${seg.color}">${frappe.utils.escape_html(amtText)}</text>
+					<polyline points="${knee.x.toFixed(1)},${knee.y.toFixed(1)} ${elbow.x.toFixed(1)},${ey} ${textX},${ey}" fill="none" stroke="${seg.color}" stroke-width="1.3"/>
+					<text class="mds-mb-amount-text" x="${labelX}" y="${(y + 5).toFixed(1)}" text-anchor="${anchor}" fill="${seg.color}">${frappe.utils.escape_html(amtText)}</text>
 					<path class="mds-mb-seg-hit" d="${d}" fill="transparent"/>
 				</g>`;
 			})

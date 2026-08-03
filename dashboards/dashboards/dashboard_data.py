@@ -507,6 +507,112 @@ def get_fixed_cost_total_for_period(from_date: str, to_date: str) -> float:
     return abs(get_gl_accounts_period_total(fixed_cost_accounts, from_date, to_date))
 
 
+def get_expense_category_account_types() -> dict[str, str]:
+    """Map every expense account to its ``Expense Category`` type — {account: "Variable"|"Fixed"}.
+
+    A category may point at a group account; its leaf descendants inherit the type. Only
+    categories flagged ``is_active`` are read, so a category can be parked without deleting it.
+    """
+    if not frappe.db.table_exists("Expense Category"):
+        return {}
+
+    categories = frappe.get_all(
+        "Expense Category",
+        filters={"is_active": 1},
+        fields=["account", "category_type"],
+    )
+
+    account_types: dict[str, str] = {}
+    for category in categories:
+        category_type = (category.category_type or "").strip().title()
+        if not category.account or category_type not in ("Fixed", "Variable"):
+            continue
+
+        account = frappe.db.get_value(
+            "Account", category.account, ["name", "is_group", "lft", "rgt"], as_dict=True
+        )
+        if not account:
+            continue
+
+        if account.is_group:
+            covered_accounts = frappe.get_all(
+                "Account",
+                filters={"is_group": 0, "lft": (">", account.lft), "rgt": ("<", account.rgt)},
+                pluck="name",
+            )
+        else:
+            covered_accounts = [account.name]
+
+        for account_name in covered_accounts:
+            account_types[account_name] = category_type
+
+    return account_types
+
+
+def get_expense_type_totals_for_period(from_date: str, to_date: str) -> dict[str, float]:
+    """Split the Харажатлар (indirect expense) period total into variable and fixed buckets.
+
+    Both buckets come strictly from the ``category_type`` of the account's active
+    ``Expense Category`` — an account no category covers belongs to neither bucket and is
+    reported separately as ``unmapped``. So ``variable + fixed`` is only the categorised part
+    of ``get_fixed_cost_total_for_period``, and it grows as the mapping is filled in.
+    """
+    empty_totals = {"variable": 0.0, "fixed": 0.0, "total": 0.0, "unmapped": 0.0}
+    expense_accounts = _filter_existing_account_names(get_fixed_cost_account_names())
+    if not expense_accounts:
+        return empty_totals
+
+    company = frappe.db.get_value("Account", expense_accounts[0], "company") or get_default_company()
+    if not company:
+        return empty_totals
+
+    from_date = str(getdate(from_date))
+    to_date = str(getdate(to_date))
+
+    rows = frappe.db.sql(
+        """
+        SELECT account, SUM(COALESCE(credit, 0) - COALESCE(debit, 0)) AS total
+        FROM `tabGL Entry`
+        WHERE company = %(company)s
+          AND account IN %(accounts)s
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          AND docstatus = 1
+          AND is_cancelled = 0
+        GROUP BY account
+        """,
+        {
+            "company": company,
+            "accounts": tuple(expense_accounts),
+            "from_date": from_date,
+            "to_date": to_date,
+        },
+        as_dict=True,
+    )
+
+    account_types = get_expense_category_account_types()
+    variable_total = 0.0
+    fixed_total = 0.0
+    unmapped_total = 0.0
+    for row in rows:
+        amount = convert_company_currency_amount(row.total, to_date, company)
+        account_type = account_types.get(row.account)
+        if account_type == "Variable":
+            variable_total += amount
+        elif account_type == "Fixed":
+            fixed_total += amount
+        else:
+            unmapped_total += amount
+
+    variable_value = abs(variable_total)
+    fixed_value = abs(fixed_total)
+    return {
+        "variable": variable_value,
+        "fixed": fixed_value,
+        "total": variable_value + fixed_value,
+        "unmapped": abs(unmapped_total),
+    }
+
+
 def get_sales_profit_and_loss_period_end(year: str | int) -> Any:
     sales_accounts = set(get_sales_account_names())
     company = frappe.db.get_value("Account", next(iter(sales_accounts), None), "company") or get_default_company()

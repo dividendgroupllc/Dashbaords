@@ -159,6 +159,14 @@ doc_events = {
 	for dt in ("Sales Invoice", "Payment Entry", "Journal Entry", "Stock Ledger Entry")
 }
 
+# Expense Category drives the variable/fixed split of the Харажатлар slices, so re-bucketing
+# an account must show up on the next open rather than after the cache TTL.
+doc_events["Expense Category"] = {
+	"on_update": "dashboards.dashboards.cache.on_ledger_change",
+	"after_insert": "dashboards.dashboards.cache.on_ledger_change",
+	"on_trash": "dashboards.dashboards.cache.on_ledger_change",
+}
+
 # Scheduled Tasks
 # ---------------
 
