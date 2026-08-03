@@ -513,19 +513,23 @@ def get_expense_category_account_types() -> dict[str, str]:
     A category may point at a group account; its leaf descendants inherit the type. Only
     categories flagged ``is_active`` are read, so a category can be parked without deleting it.
     """
-    if not frappe.db.table_exists("Expense Category"):
+    # A site whose schema has not caught up yet must degrade to "nothing mapped" rather than
+    # take the whole dashboard down with an Unknown column error.
+    if not frappe.db.table_exists("Expense Category") or not frappe.db.has_column(
+        "Expense Category", "expense_type"
+    ):
         return {}
 
     categories = frappe.get_all(
         "Expense Category",
         filters={"is_active": 1},
-        fields=["account", "category_type"],
+        fields=["account", "expense_type"],
     )
 
     account_types: dict[str, str] = {}
     for category in categories:
-        category_type = (category.category_type or "").strip().title()
-        if not category.account or category_type not in ("Fixed", "Variable"):
+        expense_type = (category.expense_type or "").strip().title()
+        if not category.account or expense_type not in ("Fixed", "Variable"):
             continue
 
         account = frappe.db.get_value(
@@ -544,7 +548,7 @@ def get_expense_category_account_types() -> dict[str, str]:
             covered_accounts = [account.name]
 
         for account_name in covered_accounts:
-            account_types[account_name] = category_type
+            account_types[account_name] = expense_type
 
     return account_types
 
@@ -552,7 +556,7 @@ def get_expense_category_account_types() -> dict[str, str]:
 def get_expense_type_totals_for_period(from_date: str, to_date: str) -> dict[str, float]:
     """Split the Харажатлар (indirect expense) period total into variable and fixed buckets.
 
-    Both buckets come strictly from the ``category_type`` of the account's active
+    Both buckets come strictly from the ``expense_type`` of the account's active
     ``Expense Category`` — an account no category covers belongs to neither bucket and is
     reported separately as ``unmapped``. So ``variable + fixed`` is only the categorised part
     of ``get_fixed_cost_total_for_period``, and it grows as the mapping is filled in.
