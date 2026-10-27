@@ -19,6 +19,9 @@ from dashboards.dashboards.dashboard_data import (
 MONTHS = [{"key": label.lower(), "label": label} for label in MONTH_LABELS]
 MONTH_MAP = {item["key"]: index + 1 for index, item in enumerate(MONTHS)}
 
+# «КГ» ustuni haqiqatan kilogrammni bildiradigan o'lchov birliklari
+KG_UOMS = {"кг", "Kg", "kg", "KG"}
+
 
 def _get_years() -> list[str]:
 	rows = frappe.db.sql(
@@ -110,11 +113,11 @@ def _get_clients(year: str, month: str, day: int | None = None) -> list[str]:
 		f"""
 		SELECT
 			COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент') AS client,
+			-- jadval bilan bir xil qoida: qaytarish summadan ayiriladi
 			SUM(COALESCE(sii.base_net_amount, sii.net_amount, sii.base_amount, sii.amount, 0)) AS sales_amount
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
-		  AND COALESCE(si.is_return, 0) = 0
 		{clause}
 		{day_clause}
 		GROUP BY COALESCE(NULLIF(si.customer_name, ''), si.customer, 'Неизвестный клиент')
@@ -133,11 +136,11 @@ def _get_calendar_values(year: str, month: str, client: str | None) -> dict[int,
 		f"""
 		SELECT
 			DAY(si.posting_date) AS day_no,
+			-- jadval bilan bir xil qoida: qaytarish kg'dan ayiriladi
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS total_qty
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
-		  AND COALESCE(si.is_return, 0) = 0
 		{clause}
 		{client_clause}
 		GROUP BY DAY(si.posting_date)
@@ -200,13 +203,23 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 			si.posting_date,
 			si.currency,
 			si.company,
+			-- QAYTARISH (2026-10-27 tuzatish): tannarx ustuni Gross Profit'dan
+			-- `include_returned_invoices = 1` bilan keladi, ya'ni qaytarishdan
+			-- TOZA. Avval kg va summa esa qaytarishni butunlay chiqarib
+			-- tashlardi (`is_return = 0`) — natijada tannarx/kg qaytarishi ko'p
+			-- mijozda sun'iy pasayib, eng ko'p qaytargan mijoz eng foydali
+			-- bo'lib ko'rinardi. Endi uchalasi bir xil qoidada: qaytarish
+			-- qatorlari manfiy qty/summa bilan keladi, oddiy SUM ularni
+			-- ayirib tashlaydi. Qaytgan kg ko'rinmay qolmasligi uchun alohida
+			-- ustunda chiqadi.
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0)) AS kg,
+			SUM(CASE WHEN COALESCE(si.is_return, 0) = 1
+				THEN ABS(COALESCE(sii.stock_qty, sii.qty, 0)) ELSE 0 END) AS returned_kg,
 			SUM(COALESCE(sii.net_amount, sii.amount, sii.base_net_amount, sii.base_amount, 0)) AS sales,
 			SUM(COALESCE(sii.stock_qty, sii.qty, 0) * COALESCE(sii.incoming_rate, 0)) AS cost
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
-		  AND COALESCE(si.is_return, 0) = 0
 		{clause}
 		{client_clause}
 		{day_clause}
@@ -231,11 +244,13 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 				"item_key": row.item_key,
 				"item": row.item,
 				"kg": 0.0,
+				"returned_kg": 0.0,
 				"sales": 0.0,
 				"cost": 0.0,
 			},
 		)
 		existing["kg"] += flt(row.kg)
+		existing["returned_kg"] += flt(row.returned_kg)
 		existing["sales"] += sales
 		existing["cost"] += flt(row.cost)
 
@@ -244,6 +259,19 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 	item_bonus_map = get_item_bonus_map(year, MONTH_MAP[month]) if values else {}
 	item_cogs_map = get_gross_profit_item_cogs_map(year, MONTH_MAP[month], customer=client, day=day) if values else {}
 
+	# «Тан нарх / кг» faqat kg'da yuritiladigan SKU'da ma'noli: dona (шт/Unit/
+	# Nos) bilan yuritiladiganlarda «КГ» ustuni aslida dona, bo'lish esa
+	# so'm/dona beradi — kartochkadagi so'm/kg bilan solishtirib bo'lmaydi,
+	# shuning uchun bo'sh qoldiriladi.
+	uom_map = {
+		item.name: item.stock_uom
+		for item in frappe.get_all(
+			"Item",
+			filters={"name": ("in", [row["item_key"] for row in values])},
+			fields=["name", "stock_uom"],
+		)
+	} if values else {}
+
 	result = []
 	for row in values:
 		sales = flt(row["sales"])
@@ -251,12 +279,16 @@ def _get_product_rows(year: str, month: str, client: str | None, day: int | None
 		margin = sales - cost
 		bonus = flt(item_bonus_map.get(row["item_key"]))
 		np = margin - bonus
+		kg = flt(row["kg"])
+		kg_uomda = uom_map.get(row["item_key"]) in KG_UOMS
 		result.append(
 			{
 				"item": row["item"],
-				"kg": round(flt(row["kg"])),
+				"kg": round(kg),
+				"returned_kg": round(flt(row["returned_kg"])),
 				"sales": round(sales),
 				"cost": round(cost),
+				"cost_per_kg": round(cost / kg) if kg > 0 and kg_uomda else None,
 				"margin": round(margin),
 				"bonus": round(bonus),
 				"profitability": (margin / sales * 100) if sales else 0,

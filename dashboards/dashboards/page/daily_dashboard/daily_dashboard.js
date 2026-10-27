@@ -228,16 +228,20 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		const headers = [
 			{ label: "Товары", className: "is-text" },
 			{ label: "КГ", className: "is-number" },
+			{ label: "Возврат кг", className: "is-number" },
 			{ label: "Сумма продаж", className: "is-number" },
-			{ label: "Себестоимость", className: "is-number" },
+			{ label: "Себестоимость (факт)", className: "is-number" },
+			{ label: "Факт себест. / кг", className: "is-number" },
 			{ label: "Маржа", className: "is-number" },
 		];
 			const colgroup = `
 				<colgroup>
 					<col style="width:260px">
 					<col style="width:90px">
+					<col style="width:100px">
 					<col style="width:150px">
 					<col style="width:150px">
+					<col style="width:110px">
 					<col style="width:150px">
 				</colgroup>
 			`;
@@ -258,8 +262,10 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 								<tr>
 									<td class="is-text">${frappe.utils.escape_html(row.item)}</td>
 									<td class="is-number">${this.formatInteger(row.kg)}</td>
+									<td class="is-number">${row.returned_kg ? this.formatInteger(row.returned_kg) : ""}</td>
 									<td class="is-number">${this.formatInteger(row.sales)}</td>
 									<td class="is-number">${this.formatInteger(row.cost)}</td>
+									<td class="is-number">${row.cost_per_kg == null ? "—" : this.formatInteger(row.cost_per_kg)}</td>
 									<td class="is-number">${this.formatInteger(row.margin)}</td>
 								</tr>
 							`
@@ -270,8 +276,10 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 						<tr class="is-total">
 							<td class="is-text">Итого</td>
 							<td class="is-number">${this.formatInteger(total.kg)}</td>
+							<td class="is-number">${this.formatInteger(total.returned_kg)}</td>
 							<td class="is-number">${this.formatInteger(total.sales)}</td>
 							<td class="is-number">${this.formatInteger(total.cost)}</td>
+							<td class="is-number">${total.kg > 0 ? this.formatInteger(total.cost / total.kg) : "—"}</td>
 							<td class="is-number">${this.formatInteger(total.margin)}</td>
 						</tr>
 					</tfoot>
@@ -318,12 +326,13 @@ dashboards.ui.DailyDashboardPage = class DailyDashboardPage {
 		const total = rows.reduce(
 			(accumulator, row) => {
 				accumulator.kg += row.kg;
+				accumulator.returned_kg += row.returned_kg || 0;
 				accumulator.sales += row.sales;
 				accumulator.cost += row.cost;
 				accumulator.margin += row.margin;
 				return accumulator;
 			},
-			{ kg: 0, sales: 0, cost: 0, margin: 0 }
+			{ kg: 0, returned_kg: 0, sales: 0, cost: 0, margin: 0 }
 		);
 
 		return total;
