@@ -150,13 +150,38 @@ app_include_js = "/assets/dashboards/js/dashboard_navigation.js?v=20260730-cost-
 
 # Invalidate cached dashboard payloads whenever a ledger-affecting document changes,
 # so dashboards reflect new invoices/payments on the next open (see dashboards/cache.py).
+#
+# HUJJAT darajasida, QATOR darajasida emas (2026-10-29). Ro'yxatda avval
+# `Stock Ledger Entry` turardi — u esa qator darajasidagi jadval: bitta Stock
+# Entry o'rtacha 12.2 SLE, bitta Sales Invoice 12.1 SLE yozadi. Natijada
+# pokiza.local'da kuniga ~272 marta BUTUN dashboard keshi o'chardi, warmer
+# esa soatda bir ishlaydi — ya'ni kesh tiklanishidan ~11 barobar tez
+# yo'qolardi va foydalanuvchi deyarli har ochishda sovuq hisobga (30 s)
+# tushardi. SLE o'rniga uni yozgan HUJJATga ulanamiz: o'sha SLE'lar
+# baribir qamrab olinadi, lekin bitta hujjat bitta tozalash beradi.
+#
+# `Repost Item Valuation` ataylab QO'SHILMADI: u ham fon churn'i (7 kunda
+# 1810 ta, kuniga ~259) va uni ulash SLE bilan bir xil holatga qaytaradi.
+# Orqa sanali qayta hisob o'z hujjati (Stock Entry / Purchase Invoice)
+# orqali va TTL zaxirasi orqali qamrab olinadi.
+#
+# Kuniga ~272 -> ~48 tozalash (o'lchangan: SI 3, PE 13, JE 6, SE 21, PI 5).
 doc_events = {
 	dt: {
 		"on_submit": "dashboards.dashboards.cache.on_ledger_change",
 		"on_cancel": "dashboards.dashboards.cache.on_ledger_change",
 		"on_update_after_submit": "dashboards.dashboards.cache.on_ledger_change",
 	}
-	for dt in ("Sales Invoice", "Payment Entry", "Journal Entry", "Stock Ledger Entry")
+	for dt in (
+		"Sales Invoice",
+		"Payment Entry",
+		"Journal Entry",
+		"Stock Entry",
+		"Purchase Invoice",
+		"Purchase Receipt",
+		"Delivery Note",
+		"Stock Reconciliation",
+	)
 }
 
 # Expense Category drives the variable/fixed split of the Харажатлар slices, so re-bucketing

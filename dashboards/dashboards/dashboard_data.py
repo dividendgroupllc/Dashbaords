@@ -515,7 +515,16 @@ def get_expense_category_account_types() -> dict[str, str]:
     """
     # A site whose schema has not caught up yet must degrade to "nothing mapped" rather than
     # take the whole dashboard down with an Unknown column error.
-    if not frappe.db.table_exists("Expense Category") or not frappe.db.has_column(
+    #
+    # The DocType must be checked, not just the table (2026-10-29). `Expense Category`
+    # is owned by the `premierprint` app; on a site where that app is not installed the
+    # DocType is absent but `tabExpense Category` can still be sitting there as an orphan
+    # table (left behind by an earlier migrate or a restored backup — exactly the state
+    # pokiza.local is in: table present, 0 rows, no DocType row). `table_exists` then
+    # returned True, the guard passed, and `frappe.get_all` below raised
+    # `DoesNotExistError: DocType Expense Category not found` — taking down the WHOLE
+    # main dashboard after ~12 s of completed work, on every single open.
+    if not frappe.db.exists("DocType", "Expense Category") or not frappe.db.has_column(
         "Expense Category", "expense_type"
     ):
         return {}
@@ -1068,6 +1077,82 @@ def _get_sales_invoice_names(
     return [str(row.name) for row in rows if row.name]
 
 
+# --- Gross Profit natijalarining keshi ---------------------------------------
+#
+# ERPNext'ning Gross Profit hisoboti dashboardning eng qimmat qismi: bitta
+# page_dashboard ochilishida u 12-13 marta ishga tushadi va 30.8 s dan 29.5 s
+# ini (96%) yeb qo'yadi. Sababi — u har schyot qatori uchun Stock Ledger'ni
+# FIFO bo'yicha qayta kezadi, ya'ni tranzaksion vosita agregat ehtiyoj uchun
+# ishlatilgan. Hisobotning O'ZI qayta yozilmaydi (raqamlar o'zgarmasligi
+# kerak), lekin natijasi IKKI qatlamda keshlanadi:
+#
+#   1. so'rov doirasida — bir ochilishda bir xil filtr ikki marta chaqiriladi
+#      (yillik «Item Code» kesimi 6.4 s + 5.9 s), bu takrorni olib tashlaydi;
+#   2. Redis'da DAVR kesimida — YOPILGAN oy o'zgarmaydi, demak uni har
+#      ochishda qayta hisoblash shart emas: 2026-yanvar tannarxi bugun yangi
+#      schyot kiritilgani uchun o'zgarmaydi. Yozuv faqat o'sha oyga hujjat
+#      tushganda eskiradi (cache.bump_period_stale).
+#
+# Natija: 10 oylik hisob bir marta hisoblanadi va keyin tekin; faqat joriy oy
+# va yillik diapazon qayta hisoblanadi, u ham foydalanuvchini kutdirmasdan
+# fon ishida (qarang cache.dashboard_cache — stale-while-revalidate).
+_GROSS_PROFIT_REQUEST_CACHE_ATTR = "dashboards_gross_profit_cache"
+_GROSS_PROFIT_REDIS_PREFIX = "dashboard|gp|"
+
+
+def _gross_profit_request_cache() -> dict:
+    cache = getattr(frappe.local, _GROSS_PROFIT_REQUEST_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        setattr(frappe.local, _GROSS_PROFIT_REQUEST_CACHE_ATTR, cache)
+    return cache
+
+
+def _gross_profit_cached(company, from_date, to_date, group_by, sales_invoice, compute):
+    """Ikki qatlamli kesh: so'rov doirasi -> Redis (davr kesimida) -> hisoblash."""
+    import time as _time
+
+    from dashboards.dashboards.cache import (
+        DASHBOARD_CACHE_HARD_TTL,
+        _is_disabled,
+        period_stale_epoch,
+    )
+
+    kalit = (str(company), str(from_date), str(to_date), str(group_by), str(sales_invoice or ""))
+
+    local_cache = _gross_profit_request_cache()
+    if kalit in local_cache:
+        return local_cache[kalit]
+
+    if _is_disabled():
+        local_cache[kalit] = compute()
+        return local_cache[kalit]
+
+    redis_key = _GROSS_PROFIT_REDIS_PREFIX + "|".join(kalit)
+    cache = frappe.cache()
+    try:
+        yozuv = cache.get_value(redis_key, expires=True)
+    except Exception:
+        yozuv = None
+
+    if isinstance(yozuv, dict) and "__v" in yozuv:
+        # Yozuv faqat DIAPAZONGA tegishli oylar o'zgarganda eskiradi
+        if flt(yozuv.get("__t")) > period_stale_epoch(from_date, to_date):
+            local_cache[kalit] = yozuv["__v"]
+            return yozuv["__v"]
+
+    natija = compute()
+    local_cache[kalit] = natija
+    try:
+        cache.set_value(
+            redis_key, {"__v": natija, "__t": _time.time()},
+            expires_in_sec=DASHBOARD_CACHE_HARD_TTL,
+        )
+    except Exception:
+        pass
+    return natija
+
+
 def _get_gross_profit_rows_for_company(
     company: str,
     from_date: str,
@@ -1077,20 +1162,21 @@ def _get_gross_profit_rows_for_company(
 ) -> tuple[list[dict[str, Any]], list[Any]]:
     from erpnext.accounts.report.gross_profit.gross_profit import execute as gross_profit_execute
 
-    filters = frappe._dict(
-        {
-            "company": company,
-            "from_date": from_date,
-            "to_date": to_date,
-            "group_by": group_by,
-            "include_returned_invoices": 1,
-        }
-    )
-    if sales_invoice:
-        filters["sales_invoice"] = sales_invoice
+    def compute():
+        filters = frappe._dict(
+            {
+                "company": company,
+                "from_date": from_date,
+                "to_date": to_date,
+                "group_by": group_by,
+                "include_returned_invoices": 1,
+            }
+        )
+        if sales_invoice:
+            filters["sales_invoice"] = sales_invoice
+        return gross_profit_execute(filters)
 
-    columns, rows = gross_profit_execute(filters)
-    return columns, rows
+    return _gross_profit_cached(company, from_date, to_date, group_by, sales_invoice, compute)
 
 
 def get_gross_profit_cost_total(
@@ -1230,7 +1316,26 @@ def _get_expense_total_by_root(
         else ""
     )
     company_filter = f" AND gle.company = {frappe.db.escape(company)}" if company else ""
-    month_filter = f" AND MONTH(gle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
+    # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
+    # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
+    # mantiqan AYNAN teng (posting_date — vaqtsiz DATE ustuni) va 4 davrda
+    # tiyinigacha bir xil natija berishi tekshirildi.
+    #
+    # DIQQAT: hozirgi hajmda bu TEZLIK bermaydi va bermasligi o'lchandi.
+    # `tabStock Ledger Entry` 126 351 qator, `voucher_type='Sales Invoice'`
+    # esa yarmiga to'g'ri keladi — bunday past selektivlikda to'liq skan
+    # (33-70 ms) indeks orqali o'qishdan TEZ. (voucher_type, posting_date)
+    # kompozit indeksi sinab ko'rildi va 133-165 ms berdi, ya'ni 2-3 barobar
+    # SEKINROQ — shuning uchun u o'chirildi. Qayta yozish baribir qoldirildi:
+    # u tekin, mantiqan ekvivalent va jadval o'sganda (yoki GL Entry'dagi
+    # kabi indeks allaqachon bor joyda) indeksdan foydalanish imkonini beradi.
+    # GL Entry'da `posting_date` indeksi bor, demak u yerda foyda hozir ham bor.
+    _dan, _gacha = _period_date_range(year, month)
+    sana_filter = (
+        f" AND gle.posting_date BETWEEN {frappe.db.escape(_dan)} AND {frappe.db.escape(_gacha)}"
+        if _dan and _gacha else ""
+    )
 
     rows = frappe.db.sql(
         f"""
@@ -1242,8 +1347,7 @@ def _get_expense_total_by_root(
         INNER JOIN `tabAccount` acc ON acc.name = gle.account
         WHERE gle.docstatus = 1
           AND gle.is_cancelled = 0
-          AND YEAR(gle.posting_date) = {frappe.db.escape(year)}
-          {month_filter}
+          {sana_filter}
           {company_filter}
           AND EXISTS (
               SELECT 1
@@ -1285,7 +1389,26 @@ def _get_income_total_by_root(
         for pattern in root_account_patterns
     )
     company_filter = f" AND gle.company = {frappe.db.escape(company)}" if company else ""
-    month_filter = f" AND MONTH(gle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
+    # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
+    # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
+    # mantiqan AYNAN teng (posting_date — vaqtsiz DATE ustuni) va 4 davrda
+    # tiyinigacha bir xil natija berishi tekshirildi.
+    #
+    # DIQQAT: hozirgi hajmda bu TEZLIK bermaydi va bermasligi o'lchandi.
+    # `tabStock Ledger Entry` 126 351 qator, `voucher_type='Sales Invoice'`
+    # esa yarmiga to'g'ri keladi — bunday past selektivlikda to'liq skan
+    # (33-70 ms) indeks orqali o'qishdan TEZ. (voucher_type, posting_date)
+    # kompozit indeksi sinab ko'rildi va 133-165 ms berdi, ya'ni 2-3 barobar
+    # SEKINROQ — shuning uchun u o'chirildi. Qayta yozish baribir qoldirildi:
+    # u tekin, mantiqan ekvivalent va jadval o'sganda (yoki GL Entry'dagi
+    # kabi indeks allaqachon bor joyda) indeksdan foydalanish imkonini beradi.
+    # GL Entry'da `posting_date` indeksi bor, demak u yerda foyda hozir ham bor.
+    _dan, _gacha = _period_date_range(year, month)
+    sana_filter = (
+        f" AND gle.posting_date BETWEEN {frappe.db.escape(_dan)} AND {frappe.db.escape(_gacha)}"
+        if _dan and _gacha else ""
+    )
 
     rows = frappe.db.sql(
         f"""
@@ -1297,8 +1420,7 @@ def _get_income_total_by_root(
         INNER JOIN `tabAccount` acc ON acc.name = gle.account
         WHERE gle.docstatus = 1
           AND gle.is_cancelled = 0
-          AND YEAR(gle.posting_date) = {frappe.db.escape(year)}
-          {month_filter}
+          {sana_filter}
           {company_filter}
           AND EXISTS (
               SELECT 1
@@ -1343,7 +1465,26 @@ def get_stock_ledger_cost_total(year: str | int | None, month: str | int | None 
         return 0
 
     month_no = _month_number(month)
-    month_filter = f" AND MONTH(sle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
+    # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
+    # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
+    # mantiqan AYNAN teng (posting_date — vaqtsiz DATE ustuni) va 4 davrda
+    # tiyinigacha bir xil natija berishi tekshirildi.
+    #
+    # DIQQAT: hozirgi hajmda bu TEZLIK bermaydi va bermasligi o'lchandi.
+    # `tabStock Ledger Entry` 126 351 qator, `voucher_type='Sales Invoice'`
+    # esa yarmiga to'g'ri keladi — bunday past selektivlikda to'liq skan
+    # (33-70 ms) indeks orqali o'qishdan TEZ. (voucher_type, posting_date)
+    # kompozit indeksi sinab ko'rildi va 133-165 ms berdi, ya'ni 2-3 barobar
+    # SEKINROQ — shuning uchun u o'chirildi. Qayta yozish baribir qoldirildi:
+    # u tekin, mantiqan ekvivalent va jadval o'sganda (yoki GL Entry'dagi
+    # kabi indeks allaqachon bor joyda) indeksdan foydalanish imkonini beradi.
+    # GL Entry'da `posting_date` indeksi bor, demak u yerda foyda hozir ham bor.
+    _dan, _gacha = _period_date_range(year, month)
+    sana_filter = (
+        f" AND sle.posting_date BETWEEN {frappe.db.escape(_dan)} AND {frappe.db.escape(_gacha)}"
+        if _dan and _gacha else ""
+    )
 
     rows = frappe.db.sql(
         f"""
@@ -1355,8 +1496,7 @@ def get_stock_ledger_cost_total(year: str | int | None, month: str | int | None 
         WHERE sle.is_cancelled = 0
           AND sle.voucher_type = 'Sales Invoice'
           AND COALESCE(sle.actual_qty, 0) < 0
-          AND YEAR(sle.posting_date) = {frappe.db.escape(year)}
-          {month_filter}
+          {sana_filter}
         GROUP BY sle.posting_date, sle.company
         """,
         as_dict=True,
@@ -1370,7 +1510,26 @@ def get_item_stock_ledger_cost_map(year: str | int | None, month: str | int | No
         return {}
 
     month_no = _month_number(month)
-    month_filter = f" AND MONTH(sle.posting_date) = {frappe.db.escape(month_no)}" if month_no else ""
+    # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
+    # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
+    # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
+    # mantiqan AYNAN teng (posting_date — vaqtsiz DATE ustuni) va 4 davrda
+    # tiyinigacha bir xil natija berishi tekshirildi.
+    #
+    # DIQQAT: hozirgi hajmda bu TEZLIK bermaydi va bermasligi o'lchandi.
+    # `tabStock Ledger Entry` 126 351 qator, `voucher_type='Sales Invoice'`
+    # esa yarmiga to'g'ri keladi — bunday past selektivlikda to'liq skan
+    # (33-70 ms) indeks orqali o'qishdan TEZ. (voucher_type, posting_date)
+    # kompozit indeksi sinab ko'rildi va 133-165 ms berdi, ya'ni 2-3 barobar
+    # SEKINROQ — shuning uchun u o'chirildi. Qayta yozish baribir qoldirildi:
+    # u tekin, mantiqan ekvivalent va jadval o'sganda (yoki GL Entry'dagi
+    # kabi indeks allaqachon bor joyda) indeksdan foydalanish imkonini beradi.
+    # GL Entry'da `posting_date` indeksi bor, demak u yerda foyda hozir ham bor.
+    _dan, _gacha = _period_date_range(year, month)
+    sana_filter = (
+        f" AND sle.posting_date BETWEEN {frappe.db.escape(_dan)} AND {frappe.db.escape(_gacha)}"
+        if _dan and _gacha else ""
+    )
 
     rows = frappe.db.sql(
         f"""
@@ -1387,8 +1546,7 @@ def get_item_stock_ledger_cost_map(year: str | int | None, month: str | int | No
           AND COALESCE(sle.actual_qty, 0) < 0
           AND si.docstatus = 1
           AND COALESCE(si.is_return, 0) = 0
-          AND YEAR(sle.posting_date) = {frappe.db.escape(year)}
-          {month_filter}
+          {sana_filter}
         GROUP BY COALESCE(NULLIF(sii.item_code, ''), NULLIF(sii.item_name, ''), 'Неизвестный товар'), sle.posting_date, sle.company
         """,
         as_dict=True,

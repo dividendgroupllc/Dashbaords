@@ -452,23 +452,20 @@ def _get_report_row_value(row, columns: list[dict[str, Any]], fieldname: str):
 
 
 def _get_gross_profit_client_rows(year: str, month: str | None = None) -> list[dict[str, Any]]:
-    from erpnext.accounts.report.gross_profit.gross_profit import execute as gross_profit_execute
+    # Bu yerda avval gross_profit_execute TO'G'RIDAN-TO'G'RI chaqirilardi, ya'ni
+    # dashboard_data'dagi kesh qatlamini chetlab o'tardi — mijoz kesimidagi
+    # yillik hisob (o'lchangan: 6.44 s) har ochishda qaytadan hisoblanardi.
+    # Endi umumiy keshlangan yo'ldan o'tadi (dashboard_data._gross_profit_cached).
+    from dashboards.dashboards.dashboard_data import _get_gross_profit_rows_for_company
 
     from_date = _period_start_date(year, month)
     to_date = _period_end_date(year, month)
     result: list[dict[str, Any]] = []
 
     for company in _get_period_companies(year, month):
-        filters = frappe._dict(
-            {
-                "company": company,
-                "from_date": from_date,
-                "to_date": to_date,
-                "group_by": "Customer",
-                "include_returned_invoices": 1,
-            }
+        columns, rows = _get_gross_profit_rows_for_company(
+            company, from_date, to_date, "Customer"
         )
-        columns, rows = gross_profit_execute(filters)
         for row in rows:
             customer = _get_report_row_value(row, columns, "customer")
             if not customer or customer == "Total":
