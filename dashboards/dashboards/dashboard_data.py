@@ -1278,7 +1278,6 @@ def _get_expense_total_by_root(
     if not year or not root_account_patterns:
         return 0
 
-    month_no = _month_number(month)
     pattern_conditions = " OR ".join(
         " OR ".join(
             [
@@ -1376,7 +1375,6 @@ def _get_income_total_by_root(
     if not year or not root_account_patterns:
         return 0
 
-    month_no = _month_number(month)
     pattern_conditions = " OR ".join(
         " OR ".join(
             [
@@ -1464,7 +1462,6 @@ def get_stock_ledger_cost_total(year: str | int | None, month: str | int | None 
     if not year:
         return 0
 
-    month_no = _month_number(month)
     # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
     # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
     # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
@@ -1509,7 +1506,6 @@ def get_item_stock_ledger_cost_map(year: str | int | None, month: str | int | No
     if not year:
         return {}
 
-    month_no = _month_number(month)
     # SARGABLE sana filtri (2026-10-29): avval `YEAR(x.posting_date) = ...`
     # (va oyiga `MONTH(...)`) ishlatilardi. Ustunga funksiya qo'llanganda
     # MySQL/MariaDB indeksdan FOYDALANA OLMAYDI. Diapazon ko'rinishi
