@@ -28,6 +28,17 @@ def execute():
     _workspacega_qosh()
     for page in PAGES:
         _hujjatga_qosh("Page", page)
+    _gl_entry_read()
+
+
+def _gl_entry_read():
+    """main-dashboard ichida P&L hisoboti yuguradi — GL Entry read shart.
+    add_permission standart ruxsatlarni custom'ga ko'chirib keyin qo'shadi
+    (bitta yalang'och Custom DocPerm qatori qolganlarini o'chirib yubormasin)."""
+    if frappe.db.exists("Custom DocPerm", {"parent": "GL Entry", "role": ROL, "permlevel": 0}):
+        return
+    from frappe.permissions import add_permission
+    add_permission("GL Entry", ROL, permlevel=0, ptype="read")
 
 
 def _workspacega_qosh():
