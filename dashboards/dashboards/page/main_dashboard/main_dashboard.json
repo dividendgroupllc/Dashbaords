@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-06-22 21:33:39.097651",
+ "modified": "2026-11-20 15:27:36.169273",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "main-dashboard",
@@ -16,6 +16,9 @@
   },
   {
    "role": "System Manager"
+  },
+  {
+   "role": "salesadmin"
   }
  ],
  "script": null,

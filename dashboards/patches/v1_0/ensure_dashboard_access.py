@@ -43,7 +43,7 @@ def ensure_workspace_roles():
     workspace.icon = "chart"
     workspace.parent_page = ""
     workspace.sequence_id = 1.5
-    workspace.set("roles", [{"role": role} for role in ACCESS_ROLES])
+    _add_missing_roles(workspace)
     workspace.save(ignore_permissions=True)
 
 
@@ -53,5 +53,19 @@ def ensure_page_roles():
             continue
 
         page = frappe.get_doc("Page", page_name)
-        page.set("roles", [{"role": role} for role in ACCESS_ROLES])
-        page.save(ignore_permissions=True)
+        if _add_missing_roles(page):
+            page.save(ignore_permissions=True)
+
+
+def _add_missing_roles(doc) -> bool:
+    """ACCESS_ROLES dan yetishmaganini QO'SHADI, borini O'CHIRMAYDI.
+
+    Avval set() bilan butunlay qayta yozilardi — bu after_migrate'da har
+    deploy'da boshqa rollarni (masalan salesadmin) o'chirib yuborardi."""
+    mavjud = {r.role for r in doc.get("roles", [])}
+    ozgardi = False
+    for role in ACCESS_ROLES:
+        if role not in mavjud:
+            doc.append("roles", {"role": role})
+            ozgardi = True
+    return ozgardi

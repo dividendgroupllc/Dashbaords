@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-06-22 21:33:39.165350",
+ "modified": "2026-11-20 15:27:36.278208",
  "modified_by": "Administrator",
  "module": "Dashboards",
  "name": "monthly-analysis",
@@ -16,6 +16,9 @@
   },
   {
    "role": "System Manager"
+  },
+  {
+   "role": "salesadmin"
   }
  ],
  "script": null,
