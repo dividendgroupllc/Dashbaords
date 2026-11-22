@@ -54,33 +54,25 @@ frappe.provide("dashboards.ui");
 			menuItemsPromise = frappe
 				.call("dashboards.api.get_dashboard_sidebar_items")
 				.then((response) => mergeMenuItems(response.message || []))
-				.catch(() => FALLBACK_MENU_ITEMS);
+				.catch(() => []);
 		}
 
 		return menuItemsPromise;
 	}
 
 	function mergeMenuItems(serverItems) {
-		const byRoute = new Map();
-		FALLBACK_MENU_ITEMS.forEach((item) => byRoute.set(item.route, item));
-		serverItems.forEach((item) => {
-			if (item && item.route) {
-				byRoute.set(item.route, item);
-			}
-		});
-
-		const orderedItems = FALLBACK_MENU_ITEMS.map((item) => byRoute.get(item.route)).filter(Boolean);
-		serverItems.forEach((item) => {
-			if (item && item.route && !FALLBACK_MENU_ITEMS.some((fallbackItem) => fallbackItem.route === item.route)) {
-				orderedItems.push(item);
-			}
-		});
-
-		return orderedItems;
+		// Server already filters by the user's page roles; only keep its items
+		// (fallback labels are used just to fill a missing label).
+		return serverItems
+			.filter((item) => item && item.route)
+			.map((item) => {
+				const fallback = FALLBACK_MENU_ITEMS.find((fallbackItem) => fallbackItem.route === item.route);
+				return { route: item.route, label: item.label || (fallback && fallback.label) || item.route };
+			});
 	}
 
 	function renderSidebar({ $sidebarHost, route, items }) {
-		const menuItems = items && items.length ? items : FALLBACK_MENU_ITEMS;
+		const menuItems = items || [];
 		const menuOpen = readBool(MENU_OPEN_KEY, true);
 		const drawerOpen = readBool(DRAWER_OPEN_KEY, false);
 
@@ -199,7 +191,8 @@ frappe.provide("dashboards.ui");
 		$layoutSection.addClass(SCOPE_CLASS);
 		const $host = $layoutSection;
 		const $sidebarHost = $host.length ? $host : $layout;
-		renderSidebar({ $sidebarHost, route, items: FALLBACK_MENU_ITEMS });
+		// Don't flash the full list before the permission-filtered one arrives.
+		renderSidebar({ $sidebarHost, route, items: [] });
 		getMenuItems().then((items) => {
 			renderSidebar({ $sidebarHost, route, items });
 		});

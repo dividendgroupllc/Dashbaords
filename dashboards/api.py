@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import frappe
+from frappe.boot import get_allowed_pages
 
 
 DEFAULT_ROUTE_ORDER = [
@@ -62,6 +63,13 @@ def get_dashboard_sidebar_items() -> list[dict[str, str]]:
         for page in sorted(pages, key=lambda page: (priority_map.get(page.name, len(priority_map)), page.title or page.name))
         if page.name not in HIDDEN_ROUTES and page.name not in route_names
     )
+
+    # Faqat userga ruxsat berilgan sahifalar: Page.roles (Has Role) yoki
+    # "Role Permission for Page and Report" (Custom Role) orqali — Frappe'ning
+    # o'z page-access mantiqi bilan bir xil. Administrator hammasini ko'radi.
+    if frappe.session.user != "Administrator":
+        allowed_pages = set(get_allowed_pages())
+        route_names = [route for route in route_names if route in allowed_pages and route in page_map]
 
     # Russian labels take precedence over Page titles from the DB, which are English.
     return [
